@@ -1,8 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\ProductController; // Importar tu controlador de Productos
-use App\Http\Controllers\RemitoController;  // Importar tu controlador de Remitos (si lo usas)
+use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -19,57 +18,59 @@ Route::get('/', function () {
 // 2. GRUPO PRINCIPAL: Rutas que requieren que el usuario esté LOGUEADO
 Route::middleware('auth')->group(function () {
     
-    // RUTA DASHBOARD: Punto de entrada después del Login. Redirige a la lista de productos.
+    // RUTA DASHBOARD: Redirige a la lista de productos
     Route::get('/dashboard', function () {
         return redirect()->route('products.index');
     })->middleware('verified')->name('dashboard');
 
 
     // --------------------------------------------------------
-    // A. ZONA DE PRODUCTOS (Rutas de Recurso y Movimiento)
+    // A. ZONA DE PRODUCTOS (Acceso General)
     // --------------------------------------------------------
     
-    // 1. RUTA DE RECURSO: Define products.index, products.create, products.edit, products.destroy, etc.
+    // 1. CRUD de Productos (Index, Create, Edit, Update, Destroy)
     Route::resource('productos', ProductController::class)->names('products');
     
-    // 2. RUTA DE MOVIMIENTO: Procesa las ENTRADAS/SALIDAS del modal
-    // Esta ruta es la que el JavaScript de tu modal está esperando.
-    // Usamos 'products.movement' como nombre para la ruta.
+    // 2. Ruta para el Modal de Movimientos de Stock
     Route::post('productos/{product}/movement', [ProductController::class, 'handleMovement'])->name('products.movement');
 
 
     // --------------------------------------------------------
-    // B. ZONA DE REMITOS (Acceso restringido: Admin y Usuario General)
+    // B. ZONA DE REMITOS (Admin y Usuario)
     // --------------------------------------------------------
     Route::middleware(['role:admin,usuario'])->group(function () {
         
-        // Ruta de Remitos
         Route::get('/remitos', function () {
-            return "<h1>Zona de Remitos</h1><p>Si lees esto, es porque NO eres empleado.</p>";
+            return "<h1>Zona de Remitos</h1><p>Aquí irá el listado de remitos.</p>";
         })->name('remitos.index');
         
     });
 
 
     // --------------------------------------------------------
-    // C. ZONA DE ADMINISTRADOR (Acceso restringido: Solo Admin)
-Route::middleware(['role:admin'])->group(function () {
-    
-    // NUEVA RUTA PARA CLIENTES
-    Route::get('/clients', function () {
-        return "<h1>Gestión de Clientes</h1><p>Solo para el Administrador.</p>";
-    })->name('clients.index'); // <-- Este nombre debe coincidir con la navbar
+    // C. ZONA DE ADMINISTRADOR (Solo Admin)
+    // --------------------------------------------------------
+    Route::middleware(['role:admin'])->group(function () {
+        
+        // Gestión de Clientes (Coincide con tu navbar)
+        Route::get('/clients', function () {
+            // Futuro: [ClientController::class, 'index']
+            return "<h1>Gestión de Clientes</h1><p>Zona exclusiva de Administrador.</p>";
+        })->name('clients.index');
 
-    Route::get('/admin/usuarios', function () {
-        return "<h1>Gestión de Usuarios</h1><p>Solo para el Administrador.</p>";
-    })->name('admin.usuarios');
-    
-});
-    // D. Rutas de Perfil
+        // Gestión de Usuarios
+        Route::get('/admin/usuarios', function () {
+            return "<h1>Gestión de Usuarios</h1><p>Zona exclusiva de Administrador.</p>";
+        })->name('admin.usuarios');
+        
+    });
+
+
+    // D. Rutas de Perfil (Breeze)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-// Incluye las rutas de autenticación de Breeze (Login, Register, Logout)
+// Rutas de autenticación
 require __DIR__.'/auth.php';
