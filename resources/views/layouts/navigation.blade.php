@@ -14,15 +14,16 @@
                         {{ __('Inicio / Productos') }}
                     </x-nav-link>
                     
-                    {{-- VERIFICACIÓN DE ROL: Admin y Usuario General --}}
-                    @if(Auth::user()->role == 'admin' || Auth::user()->role == 'usuario')
+                    {{-- VERIFICACIÓN DE ROL: Admin y Usuario --}}
+                    {{-- strtolower asegura que 'Admin' o 'admin' funcionen igual --}}
+                    @if(in_array(strtolower(Auth::user()->role), ['admin', 'usuario']))
                         <x-nav-link :href="route('remitos.index')" :active="request()->routeIs('remitos.index')">
                             {{ __('Remitos') }}
                         </x-nav-link>
                     @endif
                     
                     {{-- VERIFICACIÓN DE ROL: Solo Administrador --}}
-                    @if(Auth::user()->role == 'admin')
+                    @if(strtolower(Auth::user()->role) === 'admin')
                         <x-nav-link :href="route('clients.index')" :active="request()->routeIs('clients.index')">
                             {{ __('Clientes') }}
                         </x-nav-link>
@@ -38,7 +39,12 @@
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition ease-in-out duration-150">
-                            <div>{{ Auth::user()->name }}</div>
+                            {{-- Muestra Nombre y Rol para que sepas qué está detectando el sistema --}}
+                            <div class="text-right">
+                                <div>{{ Auth::user()->name }}</div>
+                                <div class="text-xs text-gray-400 font-bold uppercase">{{ Auth::user()->role }}</div>
+                            </div>
+
                             <div class="ms-1">
                                 <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -51,7 +57,7 @@
                         <x-dropdown-link :href="route('profile.edit')">
                             {{ __('Mi Cuenta') }}
                         </x-dropdown-link>
-                        
+
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <x-dropdown-link :href="route('logout')"
@@ -77,25 +83,22 @@
 
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
-            
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Inicio / Productos') }}
+                {{ __('Inicio') }}
             </x-responsive-nav-link>
-            
-            {{-- VERIFICACIÓN DE ROL: Admin y Usuario General (Móvil) --}}
-            @if(Auth::user()->role == 'admin' || Auth::user()->role == 'usuario')
+
+             {{-- Lógica Móvil --}}
+            @if(in_array(strtolower(Auth::user()->role), ['admin', 'usuario']))
                 <x-responsive-nav-link :href="route('remitos.index')" :active="request()->routeIs('remitos.index')">
                     {{ __('Remitos') }}
                 </x-responsive-nav-link>
             @endif
-            
-            {{-- VERIFICACIÓN DE ROL: Solo Administrador (Móvil) --}}
-            @if(Auth::user()->role == 'admin')
+
+            @if(strtolower(Auth::user()->role) === 'admin')
                 <x-responsive-nav-link :href="route('clients.index')" :active="request()->routeIs('clients.index')">
                     {{ __('Clientes') }}
                 </x-responsive-nav-link>
-
-                <x-responsive-nav-link :href="route('admin.usuarios')" :active="request()->routeIs('admin.usuarios')">
+                 <x-responsive-nav-link :href="route('admin.usuarios')" :active="request()->routeIs('admin.usuarios')">
                     {{ __('Usuarios') }}
                 </x-responsive-nav-link>
             @endif
