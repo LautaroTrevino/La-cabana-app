@@ -1,113 +1,144 @@
 @extends('layouts.app')
 
+{{-- 1. HEADER: Título en la barra superior blanca (si tu layout lo soporta) --}}
+@section('header')
+    <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+        {{ __('Gestión de Escuelas') }}
+    </h2>
+@endsection
+
 @section('content')
-<div class="container-fluid"> <div class="row mb-4 align-items-center">
-        <div class="col-md-8">
-            <h1 class="mb-0">Gestión de Escuelas y Cupos</h1>
-        </div>
-        <div class="col-md-4 text-end">
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createClientModal">
-                <i class="bi bi-plus-lg"></i> Nueva Escuela
-            </button>
-        </div>
-    </div>
+{{-- 2. WRAPPER: Espaciado para que encaje con el diseño general --}}
+<div class="py-12">
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <div class="container-fluid"> 
 
-    @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
-    @endif
-
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle table-sm"> <thead class="table-light text-center">
-                        <tr>
-                            <th class="text-start">Escuela</th>
-                            <th class="text-start">Dirección</th>
-                            <th>DMC</th>
-                            <th>DMC Alt.</th>
-                            <th>Comedor</th>
-                            <th>Com. Alt.</th>
-                            <th>Listo</th>
-                            <th>Maternal</th>
-                            <th class="text-end">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($clients as $client)
-                            <tr class="text-center">
-                                <td class="text-start fw-bold">{{ $client->name }}</td>
-                                <td class="text-start text-muted small">{{ $client->address ?? '---' }}</td>
-                                
-                                <td>
-                                    @if($client->quota_dmc > 0)
-                                        <span class="badge bg-info text-dark">{{ $client->quota_dmc }}</span>
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-
-                                <td>
-                                    @if($client->quota_dmc_alt > 0)
-                                        <span class="badge bg-warning text-dark">{{ $client->quota_dmc_alt }}</span>
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-
-                                <td>
-                                    @if($client->quota_comedor > 0)
-                                        <span class="badge bg-success">{{ $client->quota_comedor }}</span>
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-
-                                <td>
-                                    @if($client->quota_comedor_alt > 0)
-                                        <span class="badge bg-warning text-dark">{{ $client->quota_comedor_alt }}</span>
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-
-                                <td>
-                                    @if($client->quota_listo > 0)
-                                        <span class="badge bg-primary">{{ $client->quota_listo }}</span>
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-
-                                <td>
-                                    @if($client->quota_maternal > 0)
-                                        <span class="badge bg-secondary">{{ $client->quota_maternal }}</span>
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-                                
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-primary me-1" 
-                                            onclick="editClient({{ $client }})">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    
-                                    <form action="{{ route('clients.destroy', $client->id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Borrar esta escuela?');">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                                    </form>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="9" class="text-center text-muted">No hay escuelas cargadas.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            {{-- Encabezado y Botón Agregar --}}
+            <div class="row mb-4 align-items-center">
+                <div class="col-md-8">
+                    {{-- Si el header de arriba no se muestra, este título sirve de respaldo --}}
+                    <h3 class="mb-0 text-gray-800 dark:text-gray-200">Listado de Escuelas y Cupos</h3>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createClientModal">
+                        <i class="bi bi-plus-lg"></i> Nueva Escuela
+                    </button>
+                </div>
             </div>
+
+            @if(session('success'))
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle table-sm mb-0"> 
+                            <thead class="table-light text-center">
+                                <tr>
+                                    <th class="text-start ps-3">Escuela</th>
+                                    <th class="text-start">Dirección</th>
+                                    <th>DMC</th>
+                                    <th>DMC Alt.</th>
+                                    <th>Comedor</th>
+                                    <th>Com. Alt.</th>
+                                    <th>Listo</th>
+                                    <th>Maternal</th>
+                                    <th class="text-end pe-3">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{-- Usamos forelse para manejar el caso de lista vacía --}}
+                                @forelse($clients as $client)
+                                    <tr class="text-center">
+                                        <td class="text-start ps-3 fw-bold">{{ $client->name }}</td>
+                                        <td class="text-start text-muted small">{{ $client->address ?? '---' }}</td>
+                                        
+                                        <td>
+                                            @if($client->quota_dmc > 0)
+                                                <span class="badge bg-info text-dark">{{ $client->quota_dmc }}</span>
+                                            @else
+                                                <span class="text-muted text-opacity-25">-</span>
+                                            @endif
+                                        </td>
+
+                                        <td>
+                                            @if($client->quota_dmc_alt > 0)
+                                                <span class="badge bg-warning text-dark">{{ $client->quota_dmc_alt }}</span>
+                                            @else
+                                                <span class="text-muted text-opacity-25">-</span>
+                                            @endif
+                                        </td>
+
+                                        <td>
+                                            @if($client->quota_comedor > 0)
+                                                <span class="badge bg-success">{{ $client->quota_comedor }}</span>
+                                            @else
+                                                <span class="text-muted text-opacity-25">-</span>
+                                            @endif
+                                        </td>
+
+                                        <td>
+                                            @if($client->quota_comedor_alt > 0)
+                                                <span class="badge bg-warning text-dark">{{ $client->quota_comedor_alt }}</span>
+                                            @else
+                                                <span class="text-muted text-opacity-25">-</span>
+                                            @endif
+                                        </td>
+
+                                        <td>
+                                            @if($client->quota_listo > 0)
+                                                <span class="badge bg-primary">{{ $client->quota_listo }}</span>
+                                            @else
+                                                <span class="text-muted text-opacity-25">-</span>
+                                            @endif
+                                        </td>
+
+                                        <td>
+                                            @if($client->quota_maternal > 0)
+                                                <span class="badge bg-secondary">{{ $client->quota_maternal }}</span>
+                                            @else
+                                                <span class="text-muted text-opacity-25">-</span>
+                                            @endif
+                                        </td>
+                                        
+                                        <td class="text-end pe-3">
+                                            {{-- IMPORTANTE: json_encode evita errores con comillas en los nombres --}}
+                                            <button class="btn btn-sm btn-outline-primary me-1" 
+                                                    onclick="editClient({{ json_encode($client) }})">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            
+                                            <form action="{{ route('clients.destroy', $client->id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de borrar la escuela {{ $client->name }}?');">
+                                                @csrf @method('DELETE')
+                                                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="9" class="text-center py-4 text-muted">No hay escuelas cargadas.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            {{-- Paginación (opcional, solo si la usas en el controlador) --}}
+            @if(method_exists($clients, 'links'))
+                <div class="mt-4">
+                    {{ $clients->links() }}
+                </div>
+            @endif
+
         </div>
     </div>
 </div>
 
+{{-- MODAL CREAR --}}
 <div class="modal fade" id="createClientModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -131,31 +162,30 @@
 
                     <h6 class="border-bottom pb-2 mb-3 text-primary">Configuración de Cupos</h6>
                     
+                    {{-- Campos de Cupos --}}
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label class="form-label">Cupo DMC (Normal)</label>
+                            <label class="form-label">Cupo DMC</label>
                             <input type="number" name="quota_dmc" class="form-control" min="0" value="0">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Cupo DMC (Alt/Celiaco)</label>
+                            <label class="form-label">Cupo DMC Alt.</label>
                             <input type="number" name="quota_dmc_alt" class="form-control" min="0" value="0">
                         </div>
                     </div>
-
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label class="form-label">Cupo Comedor (Normal)</label>
+                            <label class="form-label">Cupo Comedor</label>
                             <input type="number" name="quota_comedor" class="form-control" min="0" value="0">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Cupo Comedor (Alt/Celiaco)</label>
+                            <label class="form-label">Cupo Comedor Alt.</label>
                             <input type="number" name="quota_comedor_alt" class="form-control" min="0" value="0">
                         </div>
                     </div>
-
                     <div class="row">
                         <div class="col-md-6">
-                            <label class="form-label">Cupo Listo Consumo</label>
+                            <label class="form-label">Cupo Listo</label>
                             <input type="number" name="quota_listo" class="form-control" min="0" value="0">
                         </div>
                         <div class="col-md-6">
@@ -173,6 +203,7 @@
     </div>
 </div>
 
+{{-- MODAL EDITAR --}}
 <div class="modal fade" id="editClientModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -206,7 +237,6 @@
                             <input type="number" name="quota_dmc_alt" id="editDmcAlt" class="form-control" min="0">
                         </div>
                     </div>
-
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Cupo Comedor</label>
@@ -217,7 +247,6 @@
                             <input type="number" name="quota_comedor_alt" id="editComedorAlt" class="form-control" min="0">
                         </div>
                     </div>
-
                     <div class="row">
                         <div class="col-md-6">
                             <label class="form-label">Cupo Listo</label>
@@ -240,8 +269,10 @@
 
 <script>
     function editClient(client) {
+        // Configuramos la acción del formulario dinámicamente
         document.getElementById('editClientForm').action = '/clients/' + client.id;
 
+        // Rellenamos los campos
         document.getElementById('editName').value = client.name;
         document.getElementById('editAddress').value = client.address ? client.address : '';
 
@@ -252,6 +283,7 @@
         document.getElementById('editListo').value = client.quota_listo;
         document.getElementById('editMaternal').value = client.quota_maternal;
 
+        // Abrimos el modal (Bootstrap 5)
         var myModal = new bootstrap.Modal(document.getElementById('editClientModal'));
         myModal.show();
     }

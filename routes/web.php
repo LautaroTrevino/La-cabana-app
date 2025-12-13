@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductController;
+use App\Models\Client; // <--- 1. IMPORTANTE: Importamos el Modelo de Clientes
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,7 +29,7 @@ Route::middleware('auth')->group(function () {
     // A. ZONA DE PRODUCTOS (Acceso General)
     // --------------------------------------------------------
     
-    // 1. CRUD de Productos (Index, Create, Edit, Update, Destroy)
+    // 1. CRUD de Productos
     Route::resource('productos', ProductController::class)->names('products');
     
     // 2. Ruta para el Modal de Movimientos de Stock
@@ -52,15 +53,37 @@ Route::middleware('auth')->group(function () {
     // --------------------------------------------------------
     Route::middleware(['role:admin'])->group(function () {
         
-        // Gestión de Clientes (Coincide con tu navbar)
+        // 1. GESTIÓN DE CLIENTES (ESCUELAS)
+        // ----------------------------------------------------
+        
+        // RUTA INDEX: Muestra la lista y soluciona el error "Undefined variable $clients"
         Route::get('/clients', function () {
-            // Futuro: [ClientController::class, 'index']
-            return "<h1>Gestión de Clientes</h1><p>Zona exclusiva de Administrador.</p>";
+            // Obtenemos todos los clientes de la BD
+            $clients = Client::all(); 
+            // Retornamos la vista pasando la variable compactada
+            return view('clients.index', compact('clients')); 
         })->name('clients.index');
 
-        // Gestión de Usuarios
+        // RUTAS ADICIONALES (Requeridas por tu vista para que no dé error de ruta no encontrada)
+        // Por ahora solo muestran texto, luego deberás crear un ClientController para la lógica real.
+        
+        Route::post('/clients', function () {
+            return "Aquí se guardará el nuevo cliente (Falta lógica en Controlador)";
+        })->name('clients.store');
+
+        Route::put('/clients/{client}', function () {
+            return "Aquí se actualizará el cliente (Falta lógica en Controlador)";
+        })->name('clients.update');
+
+        Route::delete('/clients/{client}', function () {
+            return "Aquí se borrará el cliente (Falta lógica en Controlador)";
+        })->name('clients.destroy');
+
+
+        // 2. GESTIÓN DE USUARIOS
+        // ----------------------------------------------------
         Route::get('/admin/usuarios', function () {
-            return "<h1>Gestión de Usuarios</h1><p>Zona exclusiva de Administrador.</p>";
+            return "<h1>Gestión de Usuarios</h1>"; 
         })->name('admin.usuarios');
         
     });

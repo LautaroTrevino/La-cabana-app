@@ -3,7 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\RoleMiddleware; // Importamos tu Middleware
+use App\Http\Middleware\RoleMiddleware; // <--- ¡IMPORTANTE!
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,7 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         
-        // AQUÍ ES DONDE REGISTRAMOS EL APODO 'role'
+        // REGISTRAMOS EL ALIAS 'role'
         $middleware->alias([
             'role' => RoleMiddleware::class,
         ]);

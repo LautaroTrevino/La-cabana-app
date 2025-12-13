@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Auth;
 
 class RoleMiddleware
 {
@@ -15,23 +16,21 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        // 1. Si el usuario no está logueado, a la calle (Login).
-        if (! $request->user()) {
+        // 1. Si no está logueado, al Login
+        if (!Auth::check()) {
             return redirect('/login');
         }
 
-        // 2. Obtenemos el rol del usuario (convertido a minúsculas para evitar errores)
-        $userRole = strtolower($request->user()->role);
-
-        // 3. Verificamos si el rol del usuario está en la lista de permitidos
-        // (Convertimos también los roles permitidos a minúsculas)
+        // 2. Normalizamos los roles a minúsculas para evitar errores (Admin vs admin)
+        $userRole = strtolower(Auth::user()->role);
         $allowedRoles = array_map('strtolower', $roles);
 
+        // 3. Verificamos si tiene permiso
         if (in_array($userRole, $allowedRoles)) {
-            return $next($request); // ¡Pase adelante!
+            return $next($request);
         }
 
-        // 4. Si no tiene permiso, lo mandamos al Dashboard con un error (o 403)
-        return redirect('/dashboard')->with('error', 'No tienes permisos para entrar ahí.');
+        // 4. Si falla, redirigimos al dashboard con error
+        return redirect('/dashboard')->with('error', 'No tienes permiso para acceder a esa sección.');
     }
 }
