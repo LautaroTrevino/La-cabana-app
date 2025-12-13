@@ -9,15 +9,10 @@ class Remito extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['client_id', 'date', 'number', 'observation'];
+    // Campos que permitimos guardar
+    protected $fillable = ['numero_remito', 'fecha', 'cliente', 'estado'];
 
-    // Relación: Un remito pertenece a un cliente
-    public function client()
-    {
-        return $this->belongsTo(Client::class);
-    }
-
-    // Relación: Un remito tiene muchos detalles (productos)
+    // Relación: Un remito tiene muchos detalles
     public function details()
     {
         return $this->hasMany(RemitoDetail::class);

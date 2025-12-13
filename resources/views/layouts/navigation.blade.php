@@ -10,28 +10,29 @@
 
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Inicio / Productos') }}
+                    {{-- 1. DASHBOARD (Productos) --}}
+                    <x-nav-link :href="route('products.index')" :active="request()->routeIs('products.*')">
+                        {{ __('Productos') }}
                     </x-nav-link>
-                    
-                    {{-- VERIFICACIÓN DE ROL: Admin y Usuario --}}
-                    {{-- strtolower asegura que 'Admin' o 'admin' funcionen igual --}}
-                    @if(in_array(strtolower(Auth::user()->role), ['admin', 'usuario']))
-                        <x-nav-link :href="route('remitos.index')" :active="request()->routeIs('remitos.index')">
+
+                    {{-- 2. REMITOS (Visible para Admin y Usuario) --}}
+                    @if(Auth::user()->role === 'admin' || Auth::user()->role === 'usuario')
+                        <x-nav-link :href="route('remitos.index')" :active="request()->routeIs('remitos.*')">
                             {{ __('Remitos') }}
                         </x-nav-link>
                     @endif
-                    
-                    {{-- VERIFICACIÓN DE ROL: Solo Administrador --}}
-                    @if(strtolower(Auth::user()->role) === 'admin')
-                        <x-nav-link :href="route('clients.index')" :active="request()->routeIs('clients.index')">
-                            {{ __('Clientes') }}
+
+                    {{-- 3. ZONA ADMIN (Solo visible para Admin) --}}
+                    @if(Auth::user()->role === 'admin')
+                        <x-nav-link :href="route('clients.index')" :active="request()->routeIs('clients.*')">
+                            {{ __('Clientes/Escuelas') }}
                         </x-nav-link>
 
                         <x-nav-link :href="route('admin.usuarios')" :active="request()->routeIs('admin.usuarios')">
                             {{ __('Usuarios') }}
                         </x-nav-link>
                     @endif
+
                 </div>
             </div>
 
@@ -39,11 +40,8 @@
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition ease-in-out duration-150">
-                            {{-- Muestra Nombre y Rol para que sepas qué está detectando el sistema --}}
-                            <div class="text-right">
-                                <div>{{ Auth::user()->name }}</div>
-                                <div class="text-xs text-gray-400 font-bold uppercase">{{ Auth::user()->role }}</div>
-                            </div>
+                            {{-- Mostramos Nombre y Rol --}}
+                            <div>{{ Auth::user()->name }} <span class="text-xs text-indigo-500">({{ ucfirst(Auth::user()->role) }})</span></div>
 
                             <div class="ms-1">
                                 <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -55,7 +53,7 @@
 
                     <x-slot name="content">
                         <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Mi Cuenta') }}
+                            {{ __('Perfil') }}
                         </x-dropdown-link>
 
                         <form method="POST" action="{{ route('logout') }}">
@@ -83,22 +81,22 @@
 
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Inicio') }}
+            <x-responsive-nav-link :href="route('products.index')" :active="request()->routeIs('products.*')">
+                {{ __('Productos') }}
             </x-responsive-nav-link>
 
-             {{-- Lógica Móvil --}}
-            @if(in_array(strtolower(Auth::user()->role), ['admin', 'usuario']))
-                <x-responsive-nav-link :href="route('remitos.index')" :active="request()->routeIs('remitos.index')">
+            @if(Auth::user()->role === 'admin' || Auth::user()->role === 'usuario')
+                <x-responsive-nav-link :href="route('remitos.index')" :active="request()->routeIs('remitos.*')">
                     {{ __('Remitos') }}
                 </x-responsive-nav-link>
             @endif
 
-            @if(strtolower(Auth::user()->role) === 'admin')
-                <x-responsive-nav-link :href="route('clients.index')" :active="request()->routeIs('clients.index')">
+            @if(Auth::user()->role === 'admin')
+                <x-responsive-nav-link :href="route('clients.index')" :active="request()->routeIs('clients.*')">
                     {{ __('Clientes') }}
                 </x-responsive-nav-link>
-                 <x-responsive-nav-link :href="route('admin.usuarios')" :active="request()->routeIs('admin.usuarios')">
+
+                <x-responsive-nav-link :href="route('admin.usuarios')" :active="request()->routeIs('admin.usuarios')">
                     {{ __('Usuarios') }}
                 </x-responsive-nav-link>
             @endif
@@ -112,7 +110,7 @@
 
             <div class="mt-3 space-y-1">
                 <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Mi Cuenta') }}
+                    {{ __('Perfil') }}
                 </x-responsive-nav-link>
 
                 <form method="POST" action="{{ route('logout') }}">
