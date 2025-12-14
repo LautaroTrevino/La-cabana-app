@@ -10,7 +10,7 @@
         </div>
 
         {{-- Formulario de Búsqueda --}}
-        <div class="col-md-4">
+        <div class="col-md-4 mt-3">
             <form action="{{ route('products.index') }}" method="GET">
                 <div class="input-group">
                     <input type="text" name="search" class="form-control" 
@@ -29,7 +29,7 @@
         </div>
 
         {{-- Botón Nuevo Producto --}}
-        <div class="col-md-4 text-end">
+        <div class="col-md-4 text-end mt-3">
             <a href="{{ route('products.create') }}" class="btn btn-success">
                 <i class="bi bi-plus-lg"></i> Nuevo Producto
             </a>
