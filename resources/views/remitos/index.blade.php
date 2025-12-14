@@ -40,7 +40,7 @@
                                     <th>N° Remito</th>
                                     <th>Fecha</th>
                                     <th>Cliente / Escuela</th>
-                                    <th>Cant. Items</th> {{-- Cambiamos Total por Cantidad de Items --}}
+                                    <th>Cant. Items</th>
                                     <th>Estado</th>
                                     <th class="text-end">Acciones</th>
                                 </tr>
@@ -51,7 +51,6 @@
                                         <td class="fw-bold">{{ $remito->numero_remito }}</td>
                                         <td>{{ \Carbon\Carbon::parse($remito->fecha)->format('d/m/Y') }}</td>
                                         <td>{{ $remito->cliente }}</td>
-                                        {{-- Contamos cuántos productos tiene este remito --}}
                                         <td>{{ $remito->details->count() }} Líneas</td>
                                         <td>
                                             @if($remito->estado == 'pendiente')
@@ -61,8 +60,17 @@
                                             @endif
                                         </td>
                                         <td class="text-end">
-                                            <button class="btn btn-sm btn-outline-primary" title="Ver Detalle"><i class="bi bi-eye"></i></button>
-                                            <button class="btn btn-sm btn-outline-secondary" title="Imprimir"><i class="bi bi-printer"></i></button>
+                                            {{-- CORRECCIÓN AQUÍ: Usamos etiquetas <a> con las rutas --}}
+                                            
+                                            {{-- Botón VER --}}
+                                            <a href="{{ route('remitos.show', $remito->id) }}" class="btn btn-sm btn-outline-primary" title="Ver Detalle">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            
+                                            {{-- Botón IMPRIMIR (Abre pestaña nueva) --}}
+                                            <a href="{{ route('remitos.print', $remito->id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir">
+                                                <i class="bi bi-printer"></i>
+                                            </a>
                                         </td>
                                     </tr>
                                 @empty
@@ -79,7 +87,7 @@
 
 {{-- MODAL PARA CREAR REMITO --}}
 <div class="modal fade" id="createRemitoModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg"> {{-- Modal más ancho para la tabla --}}
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title">Generar Nuevo Remito</h5>
@@ -108,7 +116,6 @@
                     <hr>
                     <h6 class="fw-bold text-success">Productos a Entregar</h6>
                     
-                    {{-- Tabla dinámica para agregar productos --}}
                     <table class="table table-sm table-bordered" id="tablaProductos">
                         <thead class="table-light">
                             <tr>
@@ -118,7 +125,6 @@
                             </tr>
                         </thead>
                         <tbody id="listaProductos">
-                            {{-- Aquí se agregarán las filas con Javascript --}}
                             <tr>
                                 <td>
                                     <select name="productos[]" class="form-select form-select-sm" required>
@@ -153,16 +159,13 @@
 </div>
 
 <script>
-    // Script simple para duplicar filas de productos
     document.getElementById('btnAgregarProducto').addEventListener('click', function() {
         var row = document.querySelector('#listaProductos tr').cloneNode(true);
-        // Limpiamos los valores del clon
         row.querySelector('select').value = '';
         row.querySelector('input').value = '';
         document.getElementById('listaProductos').appendChild(row);
     });
 
-    // Delegación de eventos para borrar filas
     document.getElementById('listaProductos').addEventListener('click', function(e) {
         if (e.target.closest('.remove-row')) {
             if (document.querySelectorAll('#listaProductos tr').length > 1) {
