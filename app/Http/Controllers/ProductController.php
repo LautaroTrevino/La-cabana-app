@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Models\Client; // <-- Importación agregada
-use App\Models\Movement; // <-- Importación agregada (Asumiendo que tienes este modelo)
+use App\Models\Client; 
+use App\Models\Movement; 
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -24,7 +24,7 @@ class ProductController extends Controller
 
         $products = $query->get();
         
-        // Agregamos esta línea para traer todos los clientes
+        // CORRECCIÓN FINALIZADA: Se cargan los clientes para el modal de movimientos en products.index
         $clients = Client::orderBy('name')->get(); 
         
         // Pasamos ambas variables a la vista
@@ -45,7 +45,7 @@ class ProductController extends Controller
             'package_code' => 'nullable|unique:products',
             'name' => 'required',
             'brand' => 'nullable|string',
-            'presentation' => 'required|string', // <-- Agregada validación de presentación
+            'presentation' => 'required|string',
             'units_per_package' => 'required|integer|min:1',
             'price_per_unit' => 'required|numeric',
             'price_per_package' => 'required|numeric',
@@ -70,7 +70,7 @@ class ProductController extends Controller
             'code' => 'required|unique:products,code,' . $id,
             'package_code' => 'nullable|unique:products,package_code,' . $id,
             'name' => 'required',
-            'presentation' => 'required|string', // <-- Agregada validación de presentación
+            'presentation' => 'required|string',
             'units_per_package' => 'required|integer|min:1',
             'price_per_unit' => 'required|numeric',
             'price_per_package' => 'required|numeric',
@@ -83,8 +83,8 @@ class ProductController extends Controller
         return redirect()->route('products.index')->with('success', '¡Producto actualizado correctamente!');
     }
 
-    // 4. CONTROL DE MOVIMIENTOS (ANTES LLAMADA 'MOVEMENT', AHORA 'handleMovement')
-    public function handleMovement(Request $request, $id) // <-- Renombrada
+    // 4. CONTROL DE MOVIMIENTOS (Desde Modal de Entrada/Salida Rápida)
+    public function handleMovement(Request $request, $id)
     {
         $product = Product::findOrFail($id);
         
@@ -92,7 +92,7 @@ class ProductController extends Controller
             'type' => 'required|in:entry,exit',
             'quantity' => 'required|integer|min:1',
             'unit_type' => 'required|in:unit,package',
-            // ESTA ES LA CLAVE: required_if si es salida, y debe existir en la tabla clients
+            // Valida que se requiere client_id SÍ O SÍ si el tipo es 'exit'
             'client_id' => 'required_if:type,exit|nullable|exists:clients,id', 
         ]);
 
@@ -111,7 +111,8 @@ class ProductController extends Controller
         $product->movements()->create([
             'type' => $request->type,
             'quantity' => $totalUnits,
-            'client_id' => $request->client_id, // Guarda el ID del cliente
+            // Solo guardamos client_id si es una salida
+            'client_id' => ($request->type == 'exit') ? $request->client_id : null, 
             'created_at' => now()
         ]);
 
@@ -141,16 +142,15 @@ class ProductController extends Controller
     // 6. HISTORIAL DE MOVIMIENTOS
     public function history(Request $request)
     {
-        // Traemos movimientos y cargamos la relación 'product' para saber el nombre
-        $query = Movement::with('product', 'client')->latest(); // <-- Agregada carga de cliente
+        // Traemos movimientos y cargamos las relaciones necesarias
+        $query = Movement::with('product', 'client')->latest(); 
 
         // Filtro por Tipo (Entrada/Salida)
         if ($request->has('type') && $request->type != '') {
             $query->where('type', $request->type);
         }
 
-        // Filtro por Cliente (Necesitarías un campo de búsqueda por cliente_id en la vista)
-        // Este filtro usa el campo 'client_id' en la tabla movements, no el nombre
+        // Filtro por Cliente
         if ($request->has('client_id') && $request->client_id != '') {
              $query->where('client_id', $request->client_id);
         }
@@ -160,9 +160,9 @@ class ProductController extends Controller
             $query->whereDate('created_at', $request->date);
         }
 
-        $movements = $query->paginate(20); // Paginamos de a 20
-        $clients = Client::all(); // Necesario para el filtro de clientes
+        $movements = $query->paginate(20); 
+        $clients = Client::all(); // Necesario para el filtro de clientes en la vista history.index
         
-        return view('history.index', compact('movements', 'clients')); // Pasamos clientes
+        return view('history.index', compact('movements', 'clients')); 
     }
 }

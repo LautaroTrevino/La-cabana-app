@@ -2,13 +2,11 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\RemitoController; // <--- Importación correcta
 use App\Models\Client;
-use App\Models\Remito;
-use App\Models\RemitoDetail; // <--- IMPRESCINDIBLE para guardar los detalles
-use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request; // <--- Necesario para procesar el formulario
+use Illuminate\Http\Request;
 
 /*
 |--------------------------------------------------------------------------
@@ -36,71 +34,31 @@ Route::middleware('auth')->group(function () {
 
 
     // --------------------------------------------------------
-    // B. ZONA DE REMITOS (Acceso: Admin y Usuario)
+    // B. ZONA DE REMITOS Y ENTREGAS (Acceso: Admin y Usuario)
     // --------------------------------------------------------
     Route::middleware(['role:admin,usuario'])->group(function () {
         
-        // 1. Mostrar lista (Index)
-        Route::get('/remitos', function () {
-            // Traemos los remitos con sus detalles para contar items en la tabla
-            $remitos = Remito::with('details')->orderBy('created_at', 'desc')->get();
-            $clients = Client::all(); 
-            $products = Product::all(); // Necesario para el modal de creación
-            return view('remitos.index', compact('remitos', 'clients', 'products'));
-        })->name('remitos.index');
+        // 1. Listado (Historial)
+        Route::get('/remitos', [RemitoController::class, 'index'])->name('remitos.index');
 
-        // 2. Guardar nuevo remito (Store)
-        Route::post('/remitos', function (Request $request) {
-            
-            // Validaciones
-            $request->validate([
-                'cliente' => 'required',
-                'fecha' => 'required|date',
-                'productos' => 'required|array',
-                'cantidades' => 'required|array',
-            ]);
+        // 2. Formulario de Creación (Maneja ?tipo=entrega o ?tipo=remito)
+        Route::get('/remitos/crear', [RemitoController::class, 'create'])->name('remitos.create');
 
-            // Generamos número único (Ej: REM-20231213-5849)
-            $numero = 'REM-' . date('Ymd') . '-' . rand(1000, 9999);
-            
-            // 1. Crear Cabecera
-            $remito = Remito::create([
-                'numero_remito' => $numero,
-                'fecha' => $request->fecha,
-                'cliente' => $request->cliente,
-                'estado' => 'pendiente'
-            ]);
+        // 3. RUTAS DE GUARDADO SEPARADAS:
 
-            // 2. Crear Detalles (Loop por los productos)
-            foreach ($request->productos as $index => $productId) {
-                // Solo guardamos si hay producto y cantidad válida
-                if (!empty($productId) && !empty($request->cantidades[$index])) {
-                    RemitoDetail::create([
-                        'remito_id' => $remito->id,
-                        'product_id' => $productId,
-                        'quantity' => $request->cantidades[$index]
-                    ]);
-                }
-            }
+        // 3a. GUARDAR ENTREGA REAL (Alternativo/Depósito) - SÍ DESCUENTA STOCK
+        // Esta ruta apunta a la función 'store' en el controlador
+        Route::post('/remitos/store/entrega', [RemitoController::class, 'store'])->name('remitos.store');
 
-            return redirect()->route('remitos.index')->with('success', 'Remito generado correctamente.');
-        })->name('remitos.store');
+        // 3b. GUARDAR REMITO OFICIAL (Menú/Administrativo) - NO DESCUENTA STOCK
+        // Esta ruta apunta a la nueva función 'storeRemitoOficial' en el controlador
+        Route::post('/remitos/store/oficial', [RemitoController::class, 'storeRemitoOficial'])->name('remitos.store_oficial');
 
-        // --- NUEVAS RUTAS DE VISUALIZACIÓN ---
+        // 4. Ver Detalle (Para imprimir o ver historial)
+        Route::get('/remitos/{remito}', [RemitoController::class, 'show'])->name('remitos.show');
 
-        // 3. Ver Detalle (Botón Ojo)
-        Route::get('/remitos/{remito}', function (Remito $remito) {
-            // Cargamos la relación 'details' y dentro de ella 'product' para ver nombres
-            $remito->load('details.product');
-            return view('remitos.show', compact('remito'));
-        })->name('remitos.show');
-
-        // 4. Imprimir (Botón Impresora)
-        Route::get('/remitos/{remito}/print', function (Remito $remito) {
-            $remito->load('details.product');
-            return view('remitos.print', compact('remito'));
-        })->name('remitos.print');
-        
+        // 5. Imprimir
+        Route::get('/remitos/{remito}/print', [RemitoController::class, 'show'])->name('remitos.print');
     });
 
 
@@ -109,13 +67,12 @@ Route::middleware('auth')->group(function () {
     // --------------------------------------------------------
     Route::middleware(['role:admin'])->group(function () {
         
-        // 1. Gestión de Clientes
+        // 1. Gestión de Clientes (Mantenemos la lógica inline)
         Route::get('/clients', function () {
             $clients = Client::all(); 
             return view('clients.index', compact('clients')); 
         })->name('clients.index');
         
-        // Rutas básicas para Clientes (evitan error de ruta faltante en la vista)
         Route::post('/clients', function (Request $request) {
             Client::create($request->all());
             return redirect()->route('clients.index')->with('success', 'Escuela agregada.');

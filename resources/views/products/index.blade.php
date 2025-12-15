@@ -28,8 +28,16 @@
             </form>
         </div>
 
-        {{-- Botón Nuevo Producto --}}
+        {{-- Botones de Acción --}}
         <div class="col-md-4 text-end mt-3">
+            
+            {{-- NUEVO BOTÓN: Registrar Entrega por Escuela (Descuenta Stock) --}}
+            {{-- Este botón lleva al formulario con el parámetro ?tipo=entrega --}}
+            <a href="{{ route('remitos.create', ['tipo' => 'entrega']) }}" class="btn btn-warning me-2 text-dark fw-bold">
+                <i class="bi bi-truck"></i> Entrega Escuela
+            </a>
+
+            {{-- Botón Nuevo Producto --}}
             <a href="{{ route('products.create') }}" class="btn btn-success">
                 <i class="bi bi-plus-lg"></i> Nuevo Producto
             </a>
@@ -87,7 +95,7 @@
                                 </h3>
                             </td>
                             <td class="text-end">
-                                {{-- Botones de Entrada/Salida (usando JS) --}}
+                                {{-- Botones de Entrada/Salida Rápida (Modal) --}}
                                 <button type="button" class="btn btn-success btn-sm me-1"
                                         onclick="openModal({{ $product->id }}, '{{ addslashes($product->name) }}', 'entry')"
                                         title="Registrar Entrada">
@@ -100,7 +108,7 @@
                                     <i class="bi bi-dash-lg"></i>
                                 </button>
 
-                                {{-- Botones de Edición/Eliminación (resueltos con Route::resource) --}}
+                                {{-- Botones de Edición/Eliminación --}}
                                 <a href="{{ route('products.edit', $product->id) }}" class="btn btn-primary btn-sm me-1" title="Editar Producto">
                                     <i class="bi bi-pencil"></i>
                                 </a>
@@ -120,7 +128,7 @@
     </div>
 </div>
 
-{{-- MODAL PARA MOVIMIENTOS DE STOCK --}}
+{{-- MODAL PARA MOVIMIENTOS DE STOCK RAPIDOS --}}
 <div class="modal fade" id="movementModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -128,7 +136,6 @@
                 <h5 class="modal-title" id="modalTitle">Registrar Movimiento</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            {{-- EL FORMULARIO APUNTARÁ A /products/ID/movement --}}
             <form id="movementForm" action="" method="POST">
                 @csrf
                 <div class="modal-body">
@@ -152,9 +159,12 @@
                         <label class="form-label fw-bold">Cliente / Escuela:</label>
                         <select name="client_id" class="form-select" id="clientSelect">
                             <option value="">-- Seleccione una Escuela --</option>
-                            @foreach($clients as $client)
-                                <option value="{{ $client->id }}">{{ $client->name }} ({{ $client->cuit }})</option>
-                            @endforeach
+                            {{-- IMPORTANTE: Para que esto no falle, el ProductController también debe enviar la variable $clients --}}
+                            @if(isset($clients))
+                                @foreach($clients as $client)
+                                    <option value="{{ $client->id }}">{{ $client->name }} ({{ $client->cuit ?? '' }})</option>
+                                @endforeach
+                            @endif
                         </select>
                     </div>
 
@@ -173,11 +183,8 @@
     </div>
 </div>
 
-{{-- SCRIPT PARA MANEJAR EL MODAL --}}
 <script>
-    // Asegúrate de incluir el CDN de Bootstrap JS en tu layouts/app.blade.php o este script no funcionará.
     function openModal(id, name, type) {
-        // 1. Obtener elementos
         const modalElement = document.getElementById('movementModal');
         const form = document.getElementById('movementForm');
         const title = document.getElementById('modalTitle');
@@ -186,26 +193,23 @@
         const clientDiv = document.getElementById('clientDiv');
         const clientSelect = document.getElementById('clientSelect');
 
-        // 2. Configurar Formulario: Usa la ruta dinámica de Laravel
-        // Importante: La acción de este formulario ahora apunta a la ruta que agregamos en web.php
+        // Configurar ruta dinámica
         form.action = '{{ url("products") }}/' + id + '/movement'; 
         nameDisplay.textContent = name;
         typeInput.value = type;
 
-        // 3. Configurar Vista según Entrada o Salida
         if (type === 'entry') {
             title.textContent = "🟢 Registrar ENTRADA";
             title.className = "modal-title text-success";
-            clientDiv.style.display = 'none'; // Ocultar clientes en entrada
+            clientDiv.style.display = 'none';
             clientSelect.required = false;
         } else {
             title.textContent = "🔴 Registrar SALIDA";
             title.className = "modal-title text-danger";
-            clientDiv.style.display = 'block'; // Mostrar clientes en salida
+            clientDiv.style.display = 'block';
             clientSelect.required = true;
         }
 
-        // 4. Abrir Modal (Bootstrap 5)
         const modal = new bootstrap.Modal(modalElement);
         modal.show();
     }
