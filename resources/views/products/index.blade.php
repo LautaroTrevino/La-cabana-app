@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
+<div class="container">
     
     <div class="row mb-4 align-items-center">
         {{-- Título --}}

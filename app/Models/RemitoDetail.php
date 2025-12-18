@@ -10,8 +10,11 @@ class RemitoDetail extends Model
     use HasFactory;
 
     // ESTA LÍNEA ES OBLIGATORIA PARA GUARDAR DATOS
-    protected $fillable = ['remito_id', 'product_id', 'quantity'];
+    protected $fillable = ['remito_id', 'product_id', 'ingredient_id', 'quantity'];
 
+    public function ingredient() {
+    return $this->belongsTo(Ingredient::class);
+    }
     // Relación inversa: Un detalle pertenece a un Producto
     public function product()
     {

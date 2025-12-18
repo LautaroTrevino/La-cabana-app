@@ -24,19 +24,18 @@
 
 <nav x-data="{ open: false }" class="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {{-- CORRECCIÓN PRINCIPAL: Cambiamos h-16 por h-24 para que entre el logo grande --}}
+        {{-- Logo grande --}}
         <div class="flex justify-between h-24">
             <div class="flex">
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}">
-                        {{-- Logo grande (h-20) --}}
                         <x-application-logo class="block h-20 w-auto fill-current texto-negro-hover-gris" />
                     </a>
                 </div>
 
+                {{-- NAVEGACIÓN DE ESCRITORIO --}}
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     
-                    {{-- Aplicamos la clase personalizada a cada enlace --}}
                     <x-nav-link :href="route('products.index')" :active="request()->routeIs('products.*')" class="texto-negro-hover-gris">
                         {{ __('Productos') }}
                     </x-nav-link>
@@ -52,6 +51,11 @@
                             {{ __('Clientes/Escuelas') }}
                         </x-nav-link>
 
+                        {{-- ✅ NUEVO ENLACE: GESTIÓN DE MENÚS --}}
+                        <x-nav-link :href="route('menus.index')" :active="request()->routeIs('menus.*')" class="texto-negro-hover-gris">
+                            {{ __('Gestión de Menús') }}
+                        </x-nav-link>
+
                         <x-nav-link :href="route('admin.usuarios')" :active="request()->routeIs('admin.usuarios')" class="texto-negro-hover-gris">
                             {{ __('Usuarios') }}
                         </x-nav-link>
@@ -63,9 +67,7 @@
             <div class="hidden sm:flex sm:items-center sm:ms-6">
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        {{-- Aplicamos la clase al botón del usuario --}}
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md bg-white dark:bg-gray-800 focus:outline-none transition ease-in-out duration-150 texto-negro-hover-gris">
-                            
                             <div>{{ Auth::user()->name }} <span class="text-xs text-indigo-500">({{ ucfirst(Auth::user()->role) }})</span></div>
 
                             <div class="ms-1">
@@ -104,6 +106,7 @@
         </div>
     </div>
 
+    {{-- MENÚ MÓVIL --}}
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('products.index')" :active="request()->routeIs('products.*')" class="texto-negro-hover-gris">
@@ -119,6 +122,11 @@
             @if(Auth::user()->role === 'admin')
                 <x-responsive-nav-link :href="route('clients.index')" :active="request()->routeIs('clients.*')" class="texto-negro-hover-gris">
                     {{ __('Clientes') }}
+                </x-responsive-nav-link>
+
+                {{-- ✅ NUEVO ENLACE MÓVIL: GESTIÓN DE MENÚS --}}
+                <x-responsive-nav-link :href="route('menus.index')" :active="request()->routeIs('menus.*')" class="texto-negro-hover-gris">
+                    {{ __('Gestión de Menús') }}
                 </x-responsive-nav-link>
 
                 <x-responsive-nav-link :href="route('admin.usuarios')" :active="request()->routeIs('admin.usuarios')" class="texto-negro-hover-gris">

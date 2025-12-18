@@ -7,6 +7,8 @@ use App\Models\Client;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
+use App\Http\Controllers\MenuController;
+use App\Http\Controllers\IngredientController;
 
 /*
 |--------------------------------------------------------------------------
@@ -106,3 +108,16 @@ Route::middleware('auth')->group(function () {
 
 // Rutas de autenticación
 require __DIR__.'/auth.php';
+
+// Rutas para la gestión de Menús
+Route::resource('menus', MenuController::class);
+
+Route::post('/ingredients/store-api', [App\Http\Controllers\MenuController::class, 'storeIngredient'])->name('ingredients.store_api');
+
+Route::post('/remitos/oficial', [RemitoController::class, 'storeRemitoOficial'])->name('remitos.storeOficial');
+Route::resource('remitos', RemitoController::class);
+
+Route::get('/remitos/{remito}/print', [App\Http\Controllers\RemitoController::class, 'print'])->name('remitos.print');
+
+// Gestión de ingredientes
+Route::resource('ingredients', IngredientController::class);

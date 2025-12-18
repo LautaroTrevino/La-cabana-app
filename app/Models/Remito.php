@@ -9,25 +9,21 @@ class Remito extends Model
 {
     use HasFactory;
 
-    // ACTUALIZADO: Agregamos 'tipo', 'observation' y estandarizamos nombres para coincidir con el Controlador
+    // IMPORTANTE: Estos nombres deben coincidir EXACTAMENTE con tu migración
     protected $fillable = [
-        'client_id',   // Clave foránea al cliente
-        'number',      // Número de remito (o 'numero_remito' si prefieres, pero debe coincidir en BD)
-        'date',        // Fecha
-        'tipo',        // VITAL: Aquí guardaremos 'remito' o 'entrega'
-        'observation', // Observaciones opcionales
-        'status'       // 'estado' (opcional, si quieres manejar anulaciones después)
+        'client_id', 
+        'number', 
+        'date', 
+        'tipo', 
+        'observation', 
+        'status'
     ];
 
-    // Relación 1: Un remito pertenece a un Cliente
-    public function client()
-    {
+    public function client() {
         return $this->belongsTo(Client::class);
     }
 
-    // Relación 2: Un remito tiene muchos detalles (productos)
-    public function details()
-    {
+    public function details() {
         return $this->hasMany(RemitoDetail::class);
     }
 }

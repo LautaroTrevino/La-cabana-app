@@ -9,11 +9,12 @@ class Client extends Model
 {
     use HasFactory;
 
-    // Agregamos 'address' a la lista de campos permitidos
+    // Agregamos 'level' para identificar si es jardin, primaria o secundaria
     protected $fillable = [
         'name', 
-        'address', // <--- NUEVO CAMPO
-        'cuit',    // Lo dejamos por si acaso, aunque no lo mostremos
+        'address',
+        'level',   // <--- NUEVO: Define qué columna del menú usar
+        'cuit',
         'quota_dmc', 
         'quota_dmc_alt', 
         'quota_comedor', 
@@ -21,4 +22,12 @@ class Client extends Model
         'quota_listo', 
         'quota_maternal'
     ];
+
+    /**
+     * Relación con los remitos
+     */
+    public function remitos()
+    {
+        return $this->hasMany(Remito::class);
+    }
 }
