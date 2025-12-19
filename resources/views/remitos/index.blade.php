@@ -89,7 +89,9 @@
                 <h5 class="modal-title"><i class="bi bi-calculator me-2"></i>Generar Remito por Menú</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form action="{{ route('remitos.storeOficial') }}" method="POST">
+            
+            {{-- CORRECCIÓN 1: La ruta apunta a storeMenu --}}
+            <form action="{{ route('remitos.storeMenu') }}" method="POST">
                 @csrf
                 <div class="modal-body">
                     <div class="row">
@@ -120,7 +122,8 @@
                         <tbody id="listaMenusRemito">
                             <tr>
                                 <td>
-                                    <select name="menu_ids[]" class="form-select" required>
+                                    {{-- CORRECCIÓN 2: name="menus[]" para coincidir con el controller --}}
+                                    <select name="menus[]" class="form-select" required>
                                         <option value="">Seleccionar menú...</option>
                                         @foreach($menus as $menu)
                                             <option value="{{ $menu->id }}">[{{ $menu->type }}] Día {{ $menu->day_number }} - {{ $menu->name }}</option>

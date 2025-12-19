@@ -9,15 +9,35 @@ class RemitoDetail extends Model
 {
     use HasFactory;
 
-    // ESTA LÍNEA ES OBLIGATORIA PARA GUARDAR DATOS
-    protected $fillable = ['remito_id', 'product_id', 'ingredient_id', 'quantity'];
+    // Campos permitidos para carga masiva
+    protected $fillable = [
+        'remito_id', 
+        'product_id', 
+        'ingredient_id', 
+        'quantity'
+    ];
 
-    public function ingredient() {
-    return $this->belongsTo(Ingredient::class);
-    }
-    // Relación inversa: Un detalle pertenece a un Producto
+    /**
+     * Relación con el Producto (Carga manual desde Depósito/Administración)
+     */
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * Relación con el Ingrediente (Carga automática desde Menú)
+     */
+    public function ingredient()
+    {
+        return $this->belongsTo(Ingredient::class);
+    }
+    
+    /**
+     * Relación con ArticuloMenu (Opcional, si aún usas este modelo)
+     */
+    public function articuloMenu()
+    {
+        return $this->belongsTo(ArticuloMenu::class, 'articulo_menu_id');
     }
 }

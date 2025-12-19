@@ -5,17 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Client; 
 use App\Models\Movement; 
+use App\Models\Remito;
+use App\Models\RemitoDetail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
-    // 1. LISTADO + BUSCADOR INTELIGENTE
+    // 1. LISTADO + BUSCADOR
     public function index(Request $request)
     {
         $query = Product::latest();
         $search = $request->input('search');
 
-        // Lógica de búsqueda (si la quieres implementar)
         if ($search) {
             $query->where('name', 'LIKE', "%{$search}%")
                   ->orWhere('brand', 'LIKE', "%{$search}%")
@@ -23,38 +25,29 @@ class ProductController extends Controller
         }
 
         $products = $query->get();
-        
-        // CORRECCIÓN FINALIZADA: Se cargan los clientes para el modal de movimientos en products.index
         $clients = Client::orderBy('name')->get(); 
         
-        // Pasamos ambas variables a la vista
         return view('products.index', compact('products', 'clients'));
     }
-    
 
-    public function create()
-    {
-        return view('products.create');
-    }
+    public function create() { return view('products.create'); }
 
-    // 2. GUARDAR NUEVO PRODUCTO
+    // 2. GUARDAR PRODUCTO
     public function store(Request $request)
     {
         $request->validate([
             'code' => 'required|unique:products',
             'package_code' => 'nullable|unique:products',
             'name' => 'required',
-            'brand' => 'nullable|string',
-            'presentation' => 'required|string',
+            'presentation' => 'required',
             'units_per_package' => 'required|integer|min:1',
             'price_per_unit' => 'required|numeric',
             'price_per_package' => 'required|numeric',
-            'stock' => 'required|integer',
+            'stock' => 'required|numeric',
         ]);
 
         Product::create($request->all());
-
-        return redirect()->route('products.index')->with('success', '¡Producto creado exitosamente!');
+        return redirect()->route('products.index')->with('success', '¡Producto creado!');
     }
 
     public function edit($id)
@@ -63,106 +56,141 @@ class ProductController extends Controller
         return view('products.edit', compact('product'));
     }
 
-    // 3. ACTUALIZAR PRODUCTO
+    // 3. ACTUALIZAR
     public function update(Request $request, $id)
     {
         $request->validate([
             'code' => 'required|unique:products,code,' . $id,
-            'package_code' => 'nullable|unique:products,package_code,' . $id,
             'name' => 'required',
-            'presentation' => 'required|string',
-            'units_per_package' => 'required|integer|min:1',
-            'price_per_unit' => 'required|numeric',
-            'price_per_package' => 'required|numeric',
-            'stock' => 'required|integer',
+            'stock' => 'required|numeric',
         ]);
 
         $product = Product::findOrFail($id);
         $product->update($request->all());
-
-        return redirect()->route('products.index')->with('success', '¡Producto actualizado correctamente!');
+        return redirect()->route('products.index')->with('success', '¡Producto actualizado!');
     }
 
-    // 4. CONTROL DE MOVIMIENTOS (Desde Modal de Entrada/Salida Rápida)
+    // 4. MOVIMIENTOS RÁPIDOS (Entrada/Salida Manual)
     public function handleMovement(Request $request, $id)
     {
         $product = Product::findOrFail($id);
         
         $request->validate([
             'type' => 'required|in:entry,exit',
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|min:0.1',
             'unit_type' => 'required|in:unit,package',
-            // Valida que se requiere client_id SÍ O SÍ si el tipo es 'exit'
             'client_id' => 'required_if:type,exit|nullable|exists:clients,id', 
         ]);
 
-        // A. Cálculo de unidades reales
         $totalUnits = $request->quantity;
         if ($request->unit_type == 'package') {
             $totalUnits = $request->quantity * $product->units_per_package;
         }
 
-        // B. Validación de stock disponible
         if ($request->type == 'exit' && $product->stock < $totalUnits) {
-            return back()->with('error', "Stock insuficiente. Intentas sacar $totalUnits unidades y tienes {$product->stock}.");
+            return back()->with('error', "Stock insuficiente. Tienes {$product->stock}.");
         }
 
-        // C. Guardar historial (Asegúrate que el modelo Product tenga la relación 'movements')
         $product->movements()->create([
             'type' => $request->type,
             'quantity' => $totalUnits,
-            // Solo guardamos client_id si es una salida
-            'client_id' => ($request->type == 'exit') ? $request->client_id : null, 
-            'created_at' => now()
+            'client_id' => ($request->type == 'exit') ? $request->client_id : null,
+            'observation' => 'Ajuste manual desde inventario'
         ]);
 
-        // D. Actualizar el stock
         if ($request->type == 'entry') {
-            $product->stock += $totalUnits;
+            $product->increment('stock', $totalUnits);
         } else {
-            $product->stock -= $totalUnits;
+            $product->decrement('stock', $totalUnits);
         }
-        
-        $product->save();
 
-        // E. Mensaje de éxito
-        $unitLabel = $request->unit_type == 'package' ? 'Cajas' : 'Unidades';
-        return back()->with('success', "Movimiento registrado: {$request->quantity} {$unitLabel} (Total: {$totalUnits} u).");
+        return back()->with('success', "Movimiento registrado correctamente.");
     }
-    
-    // 5. BORRAR PRODUCTO
+
+    // 5. BORRAR
     public function destroy($id)
     {
         $product = Product::findOrFail($id);
         $product->delete();
-
-        return redirect()->route('products.index')->with('success', '¡Producto eliminado correctamente!');
+        return redirect()->route('products.index')->with('success', '¡Producto eliminado!');
     }
 
-    // 6. HISTORIAL DE MOVIMIENTOS
+    // 6. HISTORIAL
     public function history(Request $request)
     {
-        // Traemos movimientos y cargamos las relaciones necesarias
         $query = Movement::with('product', 'client')->latest(); 
 
-        // Filtro por Tipo (Entrada/Salida)
-        if ($request->has('type') && $request->type != '') {
-            $query->where('type', $request->type);
-        }
-
-        // Filtro por Cliente
-        if ($request->has('client_id') && $request->client_id != '') {
-             $query->where('client_id', $request->client_id);
-        }
-
-        // Filtro por Fecha
-        if ($request->has('date') && $request->date != '') {
-            $query->whereDate('created_at', $request->date);
-        }
+        if ($request->filled('type')) $query->where('type', $request->type);
+        if ($request->filled('client_id')) $query->where('client_id', $request->client_id);
+        if ($request->filled('date')) $query->whereDate('created_at', $request->date);
 
         $movements = $query->paginate(20); 
-        $clients = Client::all(); // Necesario para el filtro de clientes en la vista history.index
+        $clients = Client::all();
         
         return view('history.index', compact('movements', 'clients')); 
+    }
+
+    // 7. FORMULARIO ENTREGA (ESCÁNER)
+    public function entregaEscuelaForm()
+    {
+        $clients = Client::orderBy('name')->get();
+        $products = Product::where('stock', '>', 0)->get(); 
+        return view('products.entrega_escuela', compact('clients', 'products'));
+    }
+
+    // 8. PROCESAR ENTREGA (Lógica de Negocio Principal)
+    public function procesarEntregaEscuela(Request $request)
+    {
+        $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'items' => 'required|array|min:1', // Asegura que haya al menos un producto
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.1',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $remito = Remito::create([
+                'client_id' => $request->client_id,
+                'date' => now(),
+                'number' => 'ENT-' . strtoupper(uniqid()), // Genera un número único
+                'tipo' => 'entrega', 
+                'status' => 'active'
+            ]);
+
+            foreach ($request->items as $item) {
+                $product = Product::find($item['product_id']);
+
+                if ($product->stock < $item['quantity']) {
+                    throw new \Exception("Stock insuficiente para: {$product->name}. Disponible: {$product->stock}");
+                }
+
+                // A. Descontar Stock
+                $product->decrement('stock', $item['quantity']);
+
+                // B. Registrar detalle del Remito
+                RemitoDetail::create([
+                    'remito_id' => $remito->id,
+                    'product_id' => $product->id,
+                    'quantity' => $item['quantity']
+                ]);
+
+                // C. Historial de Movimientos
+                $product->movements()->create([
+                    'type' => 'exit',
+                    'quantity' => $item['quantity'],
+                    'client_id' => $request->client_id,
+                    'observation' => 'Entrega por Escuela - Remito ' . $remito->number
+                ]);
+            }
+
+            DB::commit();
+            return redirect()->route('remitos.index')->with('success', '¡Entrega realizada con éxito!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error: ' . $e->getMessage());
+        }
     }
 }

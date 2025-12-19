@@ -5,157 +5,155 @@ namespace App\Http\Controllers;
 use App\Models\Remito;
 use App\Models\RemitoDetail;
 use App\Models\Client;
-use App\Models\Product; // <--- Esta es la que faltaba
-use App\Models\Menu;
+use App\Models\Product;
 use App\Models\Ingredient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\Menu; 
 
 class RemitoController extends Controller
 {
-   public function index() {
-    $remitos = Remito::with(['client', 'details'])->latest()->get();
-    $clients = Client::orderBy('name')->get();
-    $products = Product::orderBy('name')->get(); // Para otros usos
-    $menus = Menu::orderBy('type')->orderBy('day_number')->get(); // Necesaria para el modal
+    public function index() 
+    {
+        $remitos = Remito::with(['client', 'details.product', 'details.ingredient'])->latest()->get();
+        $clients = Client::orderBy('name')->get();
+        $menus = Menu::orderBy('name')->get(); 
+        
+        return view('remitos.index', compact('remitos', 'clients', 'menus'));
+    }
 
-    return view('remitos.index', compact('remitos', 'clients', 'products', 'menus'));
-}
-
+    // --- FLUJO ADMINISTRATIVO (Manual) ---
     public function create()
     {
         $clients = Client::orderBy('name')->get();
-        // Traemos menús ordenados
-        $menus = Menu::orderBy('type')->orderBy('day_number')->get();
-        
-        return view('remitos.create', compact('clients', 'menus'));
+        $products = Product::orderBy('name')->get();
+        return view('remitos.create', compact('clients', 'products'));
     }
 
-    /**
-     * 🧠 EL CEREBRO DE LA OPERACIÓN
-     * Genera un remito calculando ingredientes de MÚLTIPLES menús
-     */
-    public function storeRemitoOficial(Request $request)
+    public function store(Request $request)
+    {
+        $request->merge(['tipo' => 'remito']);
+        return $this->processSave($request, false);
+    }
+
+    // --- FLUJO DEPÓSITO (Manual) ---
+    public function createEntrega()
+    {
+        $clients = Client::orderBy('name')->get();
+        $products = Product::where('stock', '>', 0)->orderBy('name')->get();
+        return view('deposito.create', compact('clients', 'products'));
+    }
+
+    public function storeEntrega(Request $request)
+    {
+        $request->merge(['tipo' => 'entrega']);
+        return $this->processSave($request, true);
+    }
+
+    // --- GENERAR DESDE MENÚ (Corregido para Ingredients) ---
+    public function storeMenu(Request $request)
     {
         $request->validate([
             'client_id' => 'required|exists:clients,id',
             'date'      => 'required|date',
-            'menu_ids'  => 'required|array', // Array con los IDs de los menús seleccionados
-            'menu_ids.*'=> 'exists:menus,id',
+            'menus'     => 'required|array|min:1', 
         ]);
 
-        try {
-            DB::beginTransaction();
+        return DB::transaction(function () use ($request) {
+            
+            $numeroRemito = 'REM-MENU-' . time();
 
-            // 1. Obtenemos el cliente para saber sus cupos y nivel
-            $client = Client::findOrFail($request->client_id);
-            $nivelCliente = $client->level; // 'jardin', 'primaria', 'secundaria'
+            $remito = Remito::create([
+                'client_id'   => $request->client_id,
+                'number'      => $numeroRemito,
+                'date'        => $request->date,
+                'tipo'        => 'remito', 
+                'observation' => 'Generado automáticamente desde Menú',
+            ]);
 
-            // 2. Preparamos un array para consolidar ingredientes
-            // Clave: ID Ingrediente -> Valor: Cantidad Total
-            $ingredientesConsolidados = [];
+            foreach ($request->menus as $menuId) {
+                // CORRECCIÓN: Tu modelo usa 'ingredients', no 'details'
+                $menu = Menu::with('ingredients')->find($menuId); 
 
-            // 3. Mapeo de Tipos de Menú a Columnas de Cupos en la tabla Clients
-            $mapaCupos = [
-                'Comedor'             => 'quota_comedor',
-                'Comedor Alternativo' => 'quota_comedor_alt',
-                'DMC'                 => 'quota_dmc',
-                'DMC Alternativo'     => 'quota_dmc_alt',
-                'Listo Consumo'       => 'quota_listo',
-                'Maternal'            => 'quota_maternal',
-            ];
+                if ($menu) {
+                    foreach ($menu->ingredients as $ingredient) {
+                        // Cálculo de cantidad sumando los 3 niveles del pivot
+                        $cantidadTotal = ($ingredient->pivot->qty_jardin ?? 0) + 
+                                         ($ingredient->pivot->qty_primaria ?? 0) + 
+                                         ($ingredient->pivot->qty_secundaria ?? 0);
 
-            // 4. Recorremos cada menú seleccionado para hacer los cálculos
-            foreach ($request->menu_ids as $menuId) {
-                $menu = Menu::with('ingredients')->find($menuId);
-                
-                // Determinamos qué cupo usar según el tipo de menú
-                $columnaCupo = $mapaCupos[$menu->type] ?? null;
-                $cantidadCupos = $columnaCupo ? $client->$columnaCupo : 0;
-
-                if ($cantidadCupos > 0) {
-                    foreach ($menu->ingredients as $ingrediente) {
-                        // Obtenemos la cantidad unitaria para el nivel de la escuela
-                        // Ej: pivot->qty_primaria
-                        $cantidadUnitaria = $ingrediente->pivot->{'qty_' . $nivelCliente};
-
-                        // Cálculo: Unitaria * Cupos de ese servicio
-                        $totalIngrediente = $cantidadUnitaria * $cantidadCupos;
-
-                        // Sumamos al consolidado (Si ya existe aceite, le sumamos más aceite)
-                        if (isset($ingredientesConsolidados[$ingrediente->id])) {
-                            $ingredientesConsolidados[$ingrediente->id] += $totalIngrediente;
-                        } else {
-                            $ingredientesConsolidados[$ingrediente->id] = $totalIngrediente;
+                        // Solo agregamos si la cantidad es mayor a 0
+                        if ($cantidadTotal > 0) {
+                            $remito->details()->create([
+                                'product_id'    => null, 
+                                'ingredient_id' => $ingredient->id,
+                                'quantity'      => $cantidadTotal,
+                            ]);
                         }
                     }
                 }
             }
 
-            // 5. Si no hay ingredientes (ej: cupos en 0), error.
-            if (empty($ingredientesConsolidados)) {
-                return back()->with('error', 'No se generaron ingredientes. Verifique que el cliente tenga cupos asignados para los menús seleccionados.');
-            }
+            return redirect()->route('remitos.index')->with('success', 'Remito generado con los ingredientes del menú correctamente.');
+        });
+    }
 
-            // 6. Creamos el Remito
+    // --- LÓGICA COMÚN PARA MANUAL ---
+    private function processSave(Request $request, $shouldDiscountStock)
+    {
+        $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'date'      => 'required|date',
+            'items'     => 'required|array|min:1',
+        ]);
+
+        return DB::transaction(function () use ($request, $shouldDiscountStock) {
+            
+            $numeroRemito = $request->number ?? 'ENT-' . time();
+
             $remito = Remito::create([
-                'client_id'   => $client->id,
+                'client_id'   => $request->client_id,
+                'number'      => $numeroRemito,
                 'date'        => $request->date,
-                'observation' => 'Generado automáticamente desde menús.',
-                'number'      => 'REM-' . time(),
-                'tipo'        => 'remito', 
+                'tipo'        => $request->tipo,
+                'observation' => $request->observation,
             ]);
 
-            // 7. Guardamos los detalles consolidados
-            foreach ($ingredientesConsolidados as $ingredientId => $qtyTotal) {
-                if ($qtyTotal > 0) {
-                    // OJO: Aquí guardamos en una tabla que soporte "ingredient_id"
-                    // Si tu tabla remito_details usa product_id, necesitaremos ajustar eso.
-                    // Asumiré que quieres guardar texto o relacionar con ingredientes.
-                    // Para simplificar, guardaremos el nombre del ingrediente en "observation" o 
-                    // idealmente deberías tener un remito_detail_ingredients.
-                    
-                    // SOLUCIÓN RÁPIDA: Guardamos en remito_details vinculando al ingrediente
-                    // Asegurate de que tu modelo RemitoDetail tenga 'ingredient_id'
-                    
-                    RemitoDetail::create([
-                        'remito_id'     => $remito->id,
-                        'ingredient_id' => $ingredientId, // <--- Nueva columna necesaria o usar product_id si son lo mismo
-                        'quantity'      => $qtyTotal
-                    ]);
+            foreach ($request->items as $item) {
+                $productId = $item['product_id'];
+                $quantity = $item['quantity'];
+
+                $remito->details()->create([
+                    'product_id'    => $productId,
+                    'ingredient_id' => null,
+                    'quantity'      => $quantity,
+                ]);
+
+                if ($shouldDiscountStock) {
+                    Product::where('id', $productId)->decrement('stock', $quantity);
                 }
             }
 
-            DB::commit();
-            return redirect()->route('remitos.index')->with('success', 'Remito generado con éxito.');
+            $route = $shouldDiscountStock ? 'products.index' : 'remitos.index';
+            $message = $shouldDiscountStock ? 'Stock descontado y entrega registrada.' : 'Remito creado exitosamente.';
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Error: ' . $e->getMessage());
-        }
+            return redirect()->route($route)->with('success', $message);
+        });
     }
-    
-    // ... show y store (entrega) ...
+
+    // --- SHOW Y PDF ---
     public function show(Remito $remito)
     {
-        // Cargamos la relación con ingredientes
-        $remito->load(['details.ingredient', 'client']);
+        $remito->load(['client', 'details.product', 'details.ingredient']);
         return view('remitos.show', compact('remito'));
     }
 
     public function print(Remito $remito)
     {
-    // Carga los datos necesarios para que el PDF no de error
-    $remito->load(['client', 'details.ingredient', 'details.product']);
-
-    // Crea el PDF usando la plantilla que hicimos en el paso 2
-    $pdf = Pdf::loadView('remitos.pdf', compact('remito'));
-
-    // IMPORTANTE: Configurar tamaño CARTA
-    $pdf->setPaper('letter', 'portrait');
-
-    // Abre el PDF en una pestaña nueva
-    return $pdf->stream("Remito_{$remito->number}.pdf");
+        $remito->load(['client', 'details.product', 'details.ingredient']);
+        $pdf = Pdf::loadView('remitos.pdf', compact('remito'));
+        $pdf->setPaper('letter', 'portrait');
+        return $pdf->stream("Documento_{$remito->number}.pdf");
     }
 }

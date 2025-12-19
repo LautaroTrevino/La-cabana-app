@@ -2,19 +2,13 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\RemitoController; // <--- Importación correcta
+use App\Http\Controllers\RemitoController;
+use App\Http\Controllers\MenuController;
+use App\Http\Controllers\IngredientController;
 use App\Models\Client;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
-use App\Http\Controllers\MenuController;
-use App\Http\Controllers\IngredientController;
-
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-*/
 
 Route::get('/', function () {
     return view('welcome');
@@ -22,57 +16,57 @@ Route::get('/', function () {
 
 Route::middleware('auth')->group(function () {
     
-    // RUTA DASHBOARD: Redirige a productos
+    // DASHBOARD: Redirige según el uso principal
     Route::get('/dashboard', function () {
         return redirect()->route('products.index');
     })->middleware('verified')->name('dashboard');
 
-
     // --------------------------------------------------------
-    // A. ZONA DE PRODUCTOS (Acceso General)
+    // A. SECCIÓN DEPÓSITO: PRODUCTOS Y ENTREGAS (Descuentan Stock)
     // --------------------------------------------------------
+    // Lista de productos visible para todos los autenticados
     Route::resource('productos', ProductController::class)->names('products');
-    Route::post('productos/{product}/movement', [ProductController::class, 'handleMovement'])->name('products.movement');
-
+    
+    // Rutas de Entrega: Estas se gestionan en RemitoController pero son para el Depósito
+    Route::get('/entregas/escuela', [RemitoController::class, 'createEntrega'])
+        ->name('entregas.escuela.form');
+    Route::post('/entregas/escuela', [RemitoController::class, 'storeEntrega'])
+        ->name('entregas.escuela.store');
 
     // --------------------------------------------------------
-    // B. ZONA DE REMITOS Y ENTREGAS (Acceso: Admin y Usuario)
+    // B. SECCIÓN ADMINISTRATIVA: REMITOS (No descuentan stock)
     // --------------------------------------------------------
+    // Solo personal administrativo o admin tiene acceso aquí
     Route::middleware(['role:admin,usuario'])->group(function () {
         
-        // 1. Listado (Historial)
         Route::get('/remitos', [RemitoController::class, 'index'])->name('remitos.index');
-
-        // 2. Formulario de Creación (Maneja ?tipo=entrega o ?tipo=remito)
         Route::get('/remitos/crear', [RemitoController::class, 'create'])->name('remitos.create');
-
-        // 3. RUTAS DE GUARDADO SEPARADAS:
-
-        // 3a. GUARDAR ENTREGA REAL (Alternativo/Depósito) - SÍ DESCUENTA STOCK
-        // Esta ruta apunta a la función 'store' en el controlador
-        Route::post('/remitos/store/entrega', [RemitoController::class, 'store'])->name('remitos.store');
-
-        // 3b. GUARDAR REMITO OFICIAL (Menú/Administrativo) - NO DESCUENTA STOCK
-        // Esta ruta apunta a la nueva función 'storeRemitoOficial' en el controlador
-        Route::post('/remitos/store/oficial', [RemitoController::class, 'storeRemitoOficial'])->name('remitos.store_oficial');
-
-        // 4. Ver Detalle (Para imprimir o ver historial)
+        
+        // Guardar Remito Administrativo (Llamamos a store normal)
+        Route::post('/remitos', [RemitoController::class, 'store'])->name('remitos.store');
+        
+        // Ver y PDF
         Route::get('/remitos/{remito}', [RemitoController::class, 'show'])->name('remitos.show');
+        Route::get('/remitos/{remito}/print', [RemitoController::class, 'print'])->name('remitos.print');
 
-        // 5. Imprimir
-        Route::get('/remitos/{remito}/print', [RemitoController::class, 'show'])->name('remitos.print');
+        // Otras operaciones (edit, delete) si las necesitas
+        Route::resource('remitos', RemitoController::class)->except(['index', 'create', 'show', 'store']);
     });
 
+    // --------------------------------------------------------
+    // C. INGREDIENTES Y MENÚS
+    // --------------------------------------------------------
+    Route::resource('menus', MenuController::class);
+    Route::resource('ingredients', IngredientController::class);
+    Route::post('/ingredients/store-api', [MenuController::class, 'storeIngredient'])->name('ingredients.store_api');
 
     // --------------------------------------------------------
-    // C. ZONA DE ADMINISTRADOR (Solo Admin)
+    // D. GESTIÓN DE ESCUELAS Y USUARIOS (Solo Admin)
     // --------------------------------------------------------
     Route::middleware(['role:admin'])->group(function () {
-        
-        // 1. Gestión de Clientes (Mantenemos la lógica inline)
+        // Escuelas/Clientes
         Route::get('/clients', function () {
-            $clients = Client::all(); 
-            return view('clients.index', compact('clients')); 
+            return view('clients.index', ['clients' => Client::all()]); 
         })->name('clients.index');
         
         Route::post('/clients', function (Request $request) {
@@ -90,34 +84,18 @@ Route::middleware('auth')->group(function () {
             return redirect()->route('clients.index')->with('success', 'Escuela eliminada.');
         })->name('clients.destroy');
 
-
-        // 2. Gestión de Usuarios
+        // Usuarios
         Route::get('/admin/usuarios', function () {
-            $users = User::all();
-            return view('admin.users.index', compact('users'));
+            return view('admin.users.index', ['users' => User::all()]);
         })->name('admin.usuarios');
-        
     });
 
-
-    // D. Rutas de Perfil (Breeze)
+    // Perfil (Breeze)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-// Rutas de autenticación
 require __DIR__.'/auth.php';
 
-// Rutas para la gestión de Menús
-Route::resource('menus', MenuController::class);
-
-Route::post('/ingredients/store-api', [App\Http\Controllers\MenuController::class, 'storeIngredient'])->name('ingredients.store_api');
-
-Route::post('/remitos/oficial', [RemitoController::class, 'storeRemitoOficial'])->name('remitos.storeOficial');
-Route::resource('remitos', RemitoController::class);
-
-Route::get('/remitos/{remito}/print', [App\Http\Controllers\RemitoController::class, 'print'])->name('remitos.print');
-
-// Gestión de ingredientes
-Route::resource('ingredients', IngredientController::class);
+Route::post('/remitos/store-menu', [App\Http\Controllers\RemitoController::class, 'storeMenu'])->name('remitos.storeMenu');

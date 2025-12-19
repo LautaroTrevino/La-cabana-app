@@ -33,8 +33,8 @@
             
             {{-- NUEVO BOTÓN: Registrar Entrega por Escuela (Descuenta Stock) --}}
             {{-- Este botón lleva al formulario con el parámetro ?tipo=entrega --}}
-            <a href="{{ route('remitos.create', ['tipo' => 'entrega']) }}" class="btn btn-warning me-2 text-dark fw-bold">
-                <i class="bi bi-truck"></i> Entrega Escuela
+            <a href="{{ route('entregas.escuela.form') }}" class="btn btn-primary fw-bold">
+            <i class="bi bi-truck"></i> Entrega por Escuela (Carga Manual)
             </a>
 
             {{-- Botón Nuevo Producto --}}

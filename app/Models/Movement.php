@@ -9,7 +9,8 @@ class Movement extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['product_id', 'type', 'quantity', 'client_id']; // Debe estar 'client_id' aquí
+    // En app/Models/Movement.php
+protected $fillable = ['product_id', 'type', 'quantity', 'client_id', 'observation', 'created_at'];
 
     // Relación con el Producto
     public function product()
