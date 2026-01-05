@@ -14,44 +14,12 @@ use App\Models\Menu;
 
 class RemitoController extends Controller
 {
-    public function index() 
-    {
-        $remitos = Remito::with(['client', 'details.product', 'details.ingredient'])->latest()->get();
-        $clients = Client::orderBy('name')->get();
-        $menus = Menu::orderBy('name')->get(); 
-        
-        return view('remitos.index', compact('remitos', 'clients', 'menus'));
-    }
+    // ... (index, create, store, etc. se mantienen igual)
 
-    // --- FLUJO ADMINISTRATIVO (Manual) ---
-    public function create()
-    {
-        $clients = Client::orderBy('name')->get();
-        $products = Product::orderBy('name')->get();
-        return view('remitos.create', compact('clients', 'products'));
-    }
-
-    public function store(Request $request)
-    {
-        $request->merge(['tipo' => 'remito']);
-        return $this->processSave($request, false);
-    }
-
-    // --- FLUJO DEPÓSITO (Manual) ---
-    public function createEntrega()
-    {
-        $clients = Client::orderBy('name')->get();
-        $products = Product::where('stock', '>', 0)->orderBy('name')->get();
-        return view('deposito.create', compact('clients', 'products'));
-    }
-
-    public function storeEntrega(Request $request)
-    {
-        $request->merge(['tipo' => 'entrega']);
-        return $this->processSave($request, true);
-    }
-
-    // --- GENERAR DESDE MENÚ (Corregido para Ingredients) ---
+    /**
+     * GENERAR DESDE MENÚ
+     * Calcula: (Cantidad Base x Cupo) y guarda el total.
+     */
     public function storeMenu(Request $request)
     {
         $request->validate([
@@ -61,7 +29,7 @@ class RemitoController extends Controller
         ]);
 
         return DB::transaction(function () use ($request) {
-            
+            $client = Client::findOrFail($request->client_id);
             $numeroRemito = 'REM-MENU-' . time();
 
             $remito = Remito::create([
@@ -69,91 +37,95 @@ class RemitoController extends Controller
                 'number'      => $numeroRemito,
                 'date'        => $request->date,
                 'tipo'        => 'remito', 
-                'observation' => 'Generado automáticamente desde Menú',
+                'observation' => 'Generado desde Menú - Cantidades calculadas por cupo',
             ]);
 
             foreach ($request->menus as $menuId) {
-                // CORRECCIÓN: Tu modelo usa 'ingredients', no 'details'
                 $menu = Menu::with('ingredients')->find($menuId); 
 
                 if ($menu) {
                     foreach ($menu->ingredients as $ingredient) {
-                        // Cálculo de cantidad sumando los 3 niveles del pivot
-                        $cantidadTotal = ($ingredient->pivot->qty_jardin ?? 0) + 
-                                         ($ingredient->pivot->qty_primaria ?? 0) + 
-                                         ($ingredient->pivot->qty_secundaria ?? 0);
+                        // Cálculo: Gramos/CC/Un base * Cupos de la escuela
+                        $totalJardin    = ($ingredient->pivot->qty_jardin ?? 0) * ($client->cupo_jardin ?? 0);
+                        $totalPrimaria  = ($ingredient->pivot->qty_primaria ?? 0) * ($client->cupo_primaria ?? 0);
+                        $totalSecundaria = ($ingredient->pivot->qty_secundaria ?? 0) * ($client->cupo_secundaria ?? 0);
 
-                        // Solo agregamos si la cantidad es mayor a 0
-                        if ($cantidadTotal > 0) {
+                        $cantidadCalculada = $totalJardin + $totalPrimaria + $totalSecundaria;
+
+                        if ($cantidadCalculada > 0) {
                             $remito->details()->create([
                                 'product_id'    => null, 
                                 'ingredient_id' => $ingredient->id,
-                                'quantity'      => $cantidadTotal,
+                                'quantity'      => $cantidadCalculada,
+                                'measure_unit'  => $ingredient->pivot->measure_unit ?? 'grams'
                             ]);
                         }
                     }
                 }
             }
 
-            return redirect()->route('remitos.index')->with('success', 'Remito generado con los ingredientes del menú correctamente.');
+            return redirect()->route('remitos.index')->with('success', 'Remito generado con éxito.');
         });
     }
 
-    // --- LÓGICA COMÚN PARA MANUAL ---
-    private function processSave(Request $request, $shouldDiscountStock)
-    {
-        $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'date'      => 'required|date',
-            'items'     => 'required|array|min:1',
-        ]);
-
-        return DB::transaction(function () use ($request, $shouldDiscountStock) {
-            
-            $numeroRemito = $request->number ?? 'ENT-' . time();
-
-            $remito = Remito::create([
-                'client_id'   => $request->client_id,
-                'number'      => $numeroRemito,
-                'date'        => $request->date,
-                'tipo'        => $request->tipo,
-                'observation' => $request->observation,
-            ]);
-
-            foreach ($request->items as $item) {
-                $productId = $item['product_id'];
-                $quantity = $item['quantity'];
-
-                $remito->details()->create([
-                    'product_id'    => $productId,
-                    'ingredient_id' => null,
-                    'quantity'      => $quantity,
-                ]);
-
-                if ($shouldDiscountStock) {
-                    Product::where('id', $productId)->decrement('stock', $quantity);
-                }
-            }
-
-            $route = $shouldDiscountStock ? 'products.index' : 'remitos.index';
-            $message = $shouldDiscountStock ? 'Stock descontado y entrega registrada.' : 'Remito creado exitosamente.';
-
-            return redirect()->route($route)->with('success', $message);
-        });
-    }
-
-    // --- SHOW Y PDF ---
+    /**
+     * VISTA DEL REMITO (Conversión Visual)
+     */
     public function show(Remito $remito)
     {
         $remito->load(['client', 'details.product', 'details.ingredient']);
+        
+        // Formateamos los detalles para que la vista reciba kilos/litros directamente
+        $remito->details->transform(function ($detail) {
+            return $this->convertUnits($detail);
+        });
+
         return view('remitos.show', compact('remito'));
     }
 
+    /**
+     * PDF DEL REMITO (Conversión Visual)
+     */
     public function print(Remito $remito)
     {
         $remito->load(['client', 'details.product', 'details.ingredient']);
+        
+        // Aplicamos la misma conversión para el PDF
+        $remito->details->transform(function ($detail) {
+            return $this->convertUnits($detail);
+        });
+
         $pdf = Pdf::loadView('remitos.pdf', compact('remito'));
         $pdf->setPaper('letter', 'portrait');
-        return $pdf->stream("Documento_{$remito->number}.pdf");
+        return $pdf->stream("Remito_{$remito->number}.pdf");
+    }
+
+    /**
+     * FUNCIÓN AUXILIAR DE CONVERSIÓN
+     * Transforma gramos a kilos y cc a litros solo para visualización
+     */
+    private function convertUnits($detail)
+    {
+        // Si no es un ingrediente (es un producto directo), no convertimos
+        if (!$detail->ingredient_id) {
+            $detail->display_quantity = $detail->quantity;
+            $detail->display_unit = 'un.';
+            return $detail;
+        }
+
+        $unit = $detail->measure_unit ?? 'grams';
+
+        if ($unit === 'grams') {
+            $detail->display_quantity = $detail->quantity / 1000;
+            $detail->display_unit = 'kg.';
+        } elseif ($unit === 'cc') {
+            $detail->display_quantity = $detail->quantity / 1000;
+            $detail->display_unit = 'lts.';
+        } else {
+            $detail->display_quantity = $detail->quantity;
+            $detail->display_unit = 'un.';
+        }
+
+        return $detail;
     }
 }

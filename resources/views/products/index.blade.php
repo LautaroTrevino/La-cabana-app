@@ -1,217 +1,178 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container">
+{{-- CAMBIO 1: Usamos 'container' en lugar de 'container-fluid' para que no ocupe todo el ancho --}}
+<div class="container py-4"> 
     
-    <div class="row mb-4 align-items-center">
-        {{-- Título --}}
-        <div class="col-md-4">
-            <h1 class="mb-0">Listado de Productos</h1>
-        </div>
+    {{-- BARRA DE ESCANEO RÁPIDO --}}
+    <div class="card mb-4 border-0 shadow-sm" style="background: linear-gradient(to right, #1e293b, #334155);">
+        <div class="card-body p-4">
+            <form action="{{ route('products.quickScan') }}" method="POST" class="row g-3 align-items-end">
+                @csrf
+                
+                {{-- Selector de Modo --}}
+                <div class="col-md-3">
+                    <label class="text-white small fw-bold mb-1">MODO</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="scan_mode" id="modeEntry" value="entry" checked onchange="toggleModeColor('entry')">
+                        <label class="btn btn-outline-success fw-bold" for="modeEntry">📥 ENTRADA</label>
 
-        {{-- Formulario de Búsqueda --}}
-        <div class="col-md-4 mt-3">
-            <form action="{{ route('products.index') }}" method="GET">
-                <div class="input-group">
-                    <input type="text" name="search" class="form-control" 
-                           placeholder="Buscar por nombre, marca o código..." 
-                           value="{{ request('search') }}">
-                    <button class="btn btn-primary" type="submit">
-                        <i class="bi bi-search"></i>
+                        <input type="radio" class="btn-check" name="scan_mode" id="modeExit" value="exit" onchange="toggleModeColor('exit')">
+                        <label class="btn btn-outline-danger fw-bold" for="modeExit">🗑️ ROTURA</label>
+                    </div>
+                </div>
+
+                {{-- Input del Código --}}
+                <div class="col-md-5">
+                    <label class="text-white small fw-bold mb-1">CÓDIGO DE BARRAS</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-0"><i class="bi bi-upc-scan"></i></span>
+                        <input type="text" name="scan_code" id="scan_code" class="form-control form-control-lg border-0" 
+                               placeholder="Escanee aquí..." autofocus autocomplete="off">
+                    </div>
+                </div>
+
+                {{-- Cantidad --}}
+                <div class="col-md-2">
+                    <label class="text-white small fw-bold mb-1">CANTIDAD</label>
+                    <input type="number" name="scan_quantity" class="form-control form-control-lg border-0 text-center" 
+                           value="1" min="1" required>
+                </div>
+
+                {{-- Botón Procesar --}}
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-light btn-lg w-100 fw-bold text-dark" id="btnAction">
+                        <i class="bi bi-check-lg"></i> OK
                     </button>
-                    @if(request('search'))
-                        <a href="{{ route('products.index') }}" class="btn btn-outline-danger" title="Limpiar búsqueda">
-                            <i class="bi bi-x-lg"></i>
-                        </a>
-                    @endif
                 </div>
             </form>
         </div>
+    </div>
 
-        {{-- Botones de Acción --}}
-        <div class="col-md-4 text-end mt-3">
+    {{-- BARRA DE BÚSQUEDA Y BOTONES --}}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="mb-0 fw-bold text-gray-800">Inventario</h3>
+        </div>
+        
+        <div class="d-flex gap-2">
+            <form action="{{ route('products.index') }}" method="GET" class="d-flex">
+                <div class="input-group">
+                    <input type="text" name="search" class="form-control" placeholder="Buscar..." value="{{ request('search') }}">
+                    <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+                </div>
+            </form>
             
-            {{-- NUEVO BOTÓN: Registrar Entrega por Escuela (Descuenta Stock) --}}
-            {{-- Este botón lleva al formulario con el parámetro ?tipo=entrega --}}
-            <a href="{{ route('entregas.escuela.form') }}" class="btn btn-primary fw-bold">
-            <i class="bi bi-truck"></i> Entrega por Escuela (Carga Manual)
+            <a href="{{ route('deposito.create') }}" class="btn btn-primary text-nowrap">
+                <i class="bi bi-truck"></i> Entrega
             </a>
-
-            {{-- Botón Nuevo Producto --}}
-            <a href="{{ route('products.create') }}" class="btn btn-success">
-                <i class="bi bi-plus-lg"></i> Nuevo Producto
+            <a href="{{ route('products.create') }}" class="btn btn-success text-nowrap">
+                <i class="bi bi-plus-lg"></i> Nuevo
             </a>
         </div>
     </div>
 
-    {{-- Mensajes de Sesión --}}
+    {{-- Mensajes de Feedback --}}
     @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show">
-            {{ session('success') }}
+        <div class="alert alert-success alert-dismissible fade show shadow-sm fw-bold">
+            <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     @endif
     @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show">
-            {{ session('error') }}
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm fw-bold">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ session('error') }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     @endif
 
-    {{-- Tabla de Productos --}}
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <table class="table table-striped align-middle">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Presentación</th>
-                        <th>Precios</th>
-                        <th class="text-center">Stock</th>
-                        <th class="text-end">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($products as $product)
+    {{-- TABLA DE PRODUCTOS --}}
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
                         <tr>
-                            <td>
-                                <strong>{{ $product->name }}</strong><br>
-                                <small class="text-muted">{{ $product->brand }}</small><br>
-                                <small class="text-primary"><i class="bi bi-upc"></i> {{ $product->code }}</small>
-                            </td>
-                            <td>
-                                {{ $product->presentation }} <br>
-                                <span class="badge bg-secondary">Pack x{{ $product->units_per_package }}</span>
-                            </td>
-                            <td>
-                                <small>Unit: ${{ number_format($product->price_per_unit, 2) }}</small><br>
-                                <small>Bulto: ${{ number_format($product->price_per_package, 2) }}</small>
-                            </td>
-                            <td class="text-center">
-                                <h3>
-                                    <span class="badge {{ $product->stock < 10 ? 'bg-danger' : 'bg-success' }}">
+                            <th class="ps-4">Producto</th>
+                            <th>Presentación</th>
+                            <th>Precios</th>
+                            <th class="text-center">Stock</th>
+                            <th class="text-end pe-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($products as $product)
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark">{{ $product->name }}</div>
+                                    <div class="small text-muted">{{ $product->brand }}</div>
+                                    <div class="small text-primary font-monospace"><i class="bi bi-upc"></i> {{ $product->code }}</div>
+                                </td>
+                                <td>
+                                    {{ $product->presentation }} <br>
+                                    <span class="badge bg-secondary">Caja x{{ $product->units_per_package }}</span>
+                                </td>
+                                <td>
+                                    <div class="small">Unit: ${{ number_format($product->price_per_unit, 0, ',', '.') }}</div>
+                                    <div class="small text-muted">Bulto: ${{ number_format($product->price_per_package, 0, ',', '.') }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge {{ $product->stock < 10 ? 'bg-danger' : 'bg-success' }} fs-6">
                                         {{ $product->stock }}
                                     </span>
-                                </h3>
-                            </td>
-                            <td class="text-end">
-                                {{-- Botones de Entrada/Salida Rápida (Modal) --}}
-                                <button type="button" class="btn btn-success btn-sm me-1"
-                                        onclick="openModal({{ $product->id }}, '{{ addslashes($product->name) }}', 'entry')"
-                                        title="Registrar Entrada">
-                                    <i class="bi bi-plus-lg"></i>
-                                </button>
-
-                                <button type="button" class="btn btn-warning btn-sm me-1"
-                                        onclick="openModal({{ $product->id }}, '{{ addslashes($product->name) }}', 'exit')"
-                                        title="Registrar Salida">
-                                    <i class="bi bi-dash-lg"></i>
-                                </button>
-
-                                {{-- Botones de Edición/Eliminación --}}
-                                <a href="{{ route('products.edit', $product->id) }}" class="btn btn-primary btn-sm me-1" title="Editar Producto">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-
-                                <form action="{{ route('products.destroy', $product->id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de borrar este producto?');">
-                                    @csrf @method('DELETE')
-                                    <button class="btn btn-danger btn-sm" title="Eliminar"><i class="bi bi-trash"></i></button>
-                                </form>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="5" class="text-center py-4">No se encontraron productos.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-{{-- MODAL PARA MOVIMIENTOS DE STOCK RAPIDOS --}}
-<div class="modal fade" id="movementModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle">Registrar Movimiento</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{{ route('products.edit', $product->id) }}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    
+                                    <form action="{{ route('products.destroy', $product->id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Borrar?');">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="text-center py-5 text-muted">No hay productos registrados.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
-            <form id="movementForm" action="" method="POST">
-                @csrf
-                <div class="modal-body">
-                    
-                    <div class="alert alert-secondary text-center">
-                        Producto: <strong id="productNameDisplay">---</strong>
-                    </div>
-
-                    <input type="hidden" name="type" id="movementType">
-                    
-                    <label class="form-label">Tipo de Unidad:</label>
-                    <div class="btn-group w-100 mb-3" role="group">
-                        <input type="radio" class="btn-check" name="unit_type" id="typeUnit" value="unit" checked>
-                        <label class="btn btn-outline-primary" for="typeUnit">Unidades Sueltas</label>
-
-                        <input type="radio" class="btn-check" name="unit_type" id="typePackage" value="package">
-                        <label class="btn btn-outline-primary" for="typePackage">Cajas Cerradas</label>
-                    </div>
-
-                    <div class="mb-3" id="clientDiv">
-                        <label class="form-label fw-bold">Cliente / Escuela:</label>
-                        <select name="client_id" class="form-select" id="clientSelect">
-                            <option value="">-- Seleccione una Escuela --</option>
-                            {{-- IMPORTANTE: Para que esto no falle, el ProductController también debe enviar la variable $clients --}}
-                            @if(isset($clients))
-                                @foreach($clients as $client)
-                                    <option value="{{ $client->id }}">{{ $client->name }} ({{ $client->cuit ?? '' }})</option>
-                                @endforeach
-                            @endif
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Cantidad</label>
-                        <input type="number" name="quantity" class="form-control form-control-lg" required min="1" placeholder="Ej: 5">
-                    </div>
-
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar Movimiento</button>
-                </div>
-            </form>
         </div>
+        @if(method_exists($products, 'links'))
+            <div class="p-3 bg-light border-top">
+                {{ $products->links() }}
+            </div>
+        @endif
     </div>
 </div>
 
+{{-- SCRIPT PARA LA BARRA DE ESCANEO --}}
 <script>
-    function openModal(id, name, type) {
-        const modalElement = document.getElementById('movementModal');
-        const form = document.getElementById('movementForm');
-        const title = document.getElementById('modalTitle');
-        const nameDisplay = document.getElementById('productNameDisplay');
-        const typeInput = document.getElementById('movementType');
-        const clientDiv = document.getElementById('clientDiv');
-        const clientSelect = document.getElementById('clientSelect');
+    // Foco automático en el escáner al cargar la página
+    document.addEventListener("DOMContentLoaded", function() {
+        const input = document.getElementById('scan_code');
+        if(input) input.focus();
+    });
 
-        // Configurar ruta dinámica
-        form.action = '{{ url("products") }}/' + id + '/movement'; 
-        nameDisplay.textContent = name;
-        typeInput.value = type;
-
-        if (type === 'entry') {
-            title.textContent = "🟢 Registrar ENTRADA";
-            title.className = "modal-title text-success";
-            clientDiv.style.display = 'none';
-            clientSelect.required = false;
+    // Cambiar color del botón según el modo
+    function toggleModeColor(mode) {
+        const btn = document.getElementById('btnAction');
+        const input = document.getElementById('scan_code');
+        
+        if (mode === 'entry') {
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-light');
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> ENTRADA';
         } else {
-            title.textContent = "🔴 Registrar SALIDA";
-            title.className = "modal-title text-danger";
-            clientDiv.style.display = 'block';
-            clientSelect.required = true;
+            btn.classList.remove('btn-light');
+            btn.classList.add('btn-danger');
+            btn.innerHTML = '<i class="bi bi-trash"></i> ROTURA';
         }
-
-        const modal = new bootstrap.Modal(modalElement);
-        modal.show();
+        // Devolver el foco al input
+        input.focus();
     }
 </script>
 @endsection

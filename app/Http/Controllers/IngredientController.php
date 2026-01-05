@@ -8,23 +8,25 @@ use Illuminate\Http\Request;
 class IngredientController extends Controller
 {
     /**
-     * Muestra la lista de ingredientes para editar o borrar.
+     * Muestra la lista de ingredientes.
      */
     public function index()
     {
+        // Ordenamos alfabéticamente para facilitar la búsqueda
         $ingredients = Ingredient::orderBy('name')->get();
         return view('ingredients.index', compact('ingredients'));
     }
 
     /**
-     * Guarda un ingrediente nuevo (usado por el modal de recetas).
+     * Guarda un ingrediente nuevo.
      */
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|unique:ingredients,name',
-            'unit_type' => 'required',
-            'description' => 'nullable'
+            'name' => 'required|unique:ingredients,name|max:255',
+            // VALIDACIÓN IMPORTANTE: Solo permitimos las unidades estándar del sistema
+            'unit_type' => 'required|in:grams,cc,units', 
+            'description' => 'nullable|string|max:500'
         ]);
 
         Ingredient::create($request->all());
@@ -38,9 +40,10 @@ class IngredientController extends Controller
     public function update(Request $request, Ingredient $ingredient)
     {
         $request->validate([
-            'name' => 'required|unique:ingredients,name,' . $ingredient->id,
-            'unit_type' => 'required',
-            'description' => 'nullable'
+            // Ignoramos el ID actual para que no de error de "nombre ya existe" sobre sí mismo
+            'name' => 'required|max:255|unique:ingredients,name,' . $ingredient->id,
+            'unit_type' => 'required|in:grams,cc,units',
+            'description' => 'nullable|string|max:500'
         ]);
 
         $ingredient->update($request->all());
@@ -49,13 +52,14 @@ class IngredientController extends Controller
     }
 
     /**
-     * Elimina el ingrediente si no está en uso.
+     * Elimina el ingrediente si no está en uso en ninguna receta.
      */
     public function destroy(Ingredient $ingredient)
     {
-        // Verificamos si tiene menús asociados para no romper las recetas
+        // Protección de integridad: No borrar si se usa en un menú
+        // Asumiendo que tienes la relación 'menus' en el modelo Ingredient
         if ($ingredient->menus()->count() > 0) {
-            return back()->with('error', 'No se puede eliminar: este ingrediente forma parte de una o más recetas.');
+            return back()->with('error', '⚠️ No se puede eliminar: El ingrediente "' . $ingredient->name . '" se usa en una o más recetas activas.');
         }
 
         $ingredient->delete();
