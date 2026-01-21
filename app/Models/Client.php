@@ -9,18 +9,32 @@ class Client extends Model
 {
     use HasFactory;
 
-    // Agregamos 'level' para identificar si es jardin, primaria o secundaria
     protected $fillable = [
+        // Datos de Contacto e Identificación
         'name', 
         'address',
-        'level',   // <--- NUEVO: Define qué columna del menú usar
+        'phone',
+        'email',
         'cuit',
+        'level',   
+
+        // Cupos por Nivel (Usados para cálculo de cantidades en recetas)
+        'cupo_jardin', 
+        'cupo_primaria', 
+        'cupo_secundaria',
+
+        // Valores Financieros (NUEVO: Para el Balance)
+        'valor_dmc', 
+        'valor_comedor', 
+        'valor_lc',
+
+        // Cupos Específicos (Legado/Otros)
         'quota_dmc', 
         'quota_dmc_alt', 
         'quota_comedor', 
         'quota_comedor_alt', 
         'quota_listo', 
-        'quota_maternal'
+        'quota_maternal',
     ];
 
     /**
