@@ -73,7 +73,9 @@
             {{-- TABLA 1: ORDENES DE ENTREGA (DEPÓSITO) --}}
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-gray-800 fw-bold"><i class="bi bi-box-seam text-dark"></i> Órdenes de Entrega (Stock)</h4>
-                <a href="{{ route('deposito.create') }}" class="btn btn-dark btn-sm">
+                
+                {{-- CORRECCIÓN AQUÍ: Usamos ordenes.create --}}
+                <a href="{{ route('ordenes.create') }}" class="btn btn-dark btn-sm">
                     <i class="bi bi-plus-lg"></i> Nueva Entrega
                 </a>
             </div>

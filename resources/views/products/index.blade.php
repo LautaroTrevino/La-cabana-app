@@ -63,7 +63,8 @@
                 </div>
             </form>
             
-            <a href="{{ route('deposito.create') }}" class="btn btn-primary text-nowrap">
+            {{-- CORRECCIÓN AQUÍ: Ruta actualizada a ordenes.create --}}
+            <a href="{{ route('ordenes.create') }}" class="btn btn-primary text-nowrap">
                 <i class="bi bi-truck"></i> Entrega
             </a>
             <a href="{{ route('products.create') }}" class="btn btn-success text-nowrap">

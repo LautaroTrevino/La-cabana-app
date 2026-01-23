@@ -8,6 +8,7 @@ class OrdenEntregaDetail extends Model
 {
     protected $fillable = ['orden_entrega_id', 'product_id', 'quantity'];
 
+    // Relación con el producto del depósito
     public function product()
     {
         return $this->belongsTo(Product::class);

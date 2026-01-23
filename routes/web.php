@@ -7,6 +7,7 @@ use App\Http\Controllers\MenuController;
 use App\Http\Controllers\IngredientController;
 use App\Http\Controllers\ClientController; 
 use App\Http\Controllers\BalanceController;
+use App\Http\Controllers\OrdenEntregaController; // <--- AGREGADO
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -34,11 +35,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/products/{id}/movement', [ProductController::class, 'storeMovement'])->name('products.movement');
     Route::get('/historial', [ProductController::class, 'history'])->name('history.index');
 
-    // 2. DEPÓSITO
-    Route::get('/deposito/nuevo', [RemitoController::class, 'createEntrega'])->name('deposito.create');
-    Route::post('/deposito/guardar', [RemitoController::class, 'storeEntrega'])->name('deposito.store');
+    // 2. DEPÓSITO (SALIDA REAL DE MERCADERÍA)
+    // Pantalla del Escáner
+    Route::get('/deposito/salida', [OrdenEntregaController::class, 'create'])->name('ordenes.create');
+    // Guardar la salida y descontar stock
+    Route::post('/deposito/guardar-real', [OrdenEntregaController::class, 'storeReal'])->name('ordenes.storeReal');
 
-    // 3. REMITOS
+    // 3. REMITOS (DOCUMENTACIÓN ADMINISTRATIVA)
     Route::get('/remitos', [RemitoController::class, 'index'])->name('remitos.index');
     Route::get('/remitos/{remito}', [RemitoController::class, 'show'])->name('remitos.show');
     Route::get('/remitos/{remito}/print', [RemitoController::class, 'print'])->name('remitos.print');
@@ -55,11 +58,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/balance', [BalanceController::class, 'index'])->name('balance.index');
 
     // 6. CLIENTES (ESCUELAS)
-    // --- ESTA RUTA DEBE IR PRIMERO ---
     Route::put('/clients/update-global-prices', [ClientController::class, 'updateGlobalPrices'])
         ->name('clients.updateGlobalPrices');
-    
-    // --- LUEGO EL RESOURCE ---
     Route::resource('clients', ClientController::class);
 
     // 7. ADMIN USUARIOS
