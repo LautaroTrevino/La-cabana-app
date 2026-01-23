@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\OrdenEntrega;
 use App\Models\Product;
-use App\Models\Client; // <--- Agregado para poder buscar las escuelas
+use App\Models\Client; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,10 +13,10 @@ class OrdenEntregaController extends Controller
     // --- 1. GUARDAR ENTREGA REAL (Desde Escáner o Carga Manual) ---
     public function storeReal(Request $request)
     {
+        // VALIDACIÓN: Aquí estaba el error. Quitamos 'menu_type' porque ya no viene del formulario.
         $request->validate([
             'client_id' => 'required|exists:clients,id',
             'date'      => 'required|date',
-            'menu_type' => 'required|string', // VITAL: "Comedor", "DMC", etc.
             'items'     => 'required|array|min:1', 
         ]);
 
@@ -27,7 +27,7 @@ class OrdenEntregaController extends Controller
                 'client_id'   => $request->client_id,
                 'number'      => 'ORD-' . time(),
                 'date'        => $request->date,
-                'menu_type'   => $request->menu_type, 
+                'menu_type'   => 'Manual', // Forzamos este valor internamente
                 'observation' => $request->observation,
             ]);
 
@@ -56,11 +56,7 @@ class OrdenEntregaController extends Controller
     // --- 2. MOSTRAR PANTALLA DE ESCÁNER ---
     public function create()
     {
-        // Traemos las escuelas para el desplegable
         $clients = Client::orderBy('name')->get();
-        
-        // Traemos productos para el buscador (solo los que tengan stock positivo opcionalmente)
-        // Si quieres ver todos aunque no haya stock, quita el ->where('stock', '>', 0)
         $products = Product::orderBy('name')->get();
 
         return view('deposito.create', compact('clients', 'products'));

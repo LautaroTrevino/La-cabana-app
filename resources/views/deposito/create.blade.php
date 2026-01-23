@@ -5,9 +5,9 @@
     
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold text-gray-800">
-            <i class="bi bi-upc-scan text-primary"></i> Salida de Mercadería (Real)
+            <i class="bi bi-upc-scan text-primary"></i> Salida de Mercadería (Depósito)
         </h2>
-        <a href="{{ route('dashboard') }}" class="btn btn-secondary">
+        <a href="{{ route('products.index') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Volver
         </a>
     </div>
@@ -16,12 +16,12 @@
         <div class="col-md-4">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-primary text-white fw-bold py-3">
-                    <i class="bi bi-geo-alt-fill"></i> Datos de Destino
+                    <i class="bi bi-geo-alt-fill"></i> Datos de Entrega
                 </div>
                 <div class="card-body bg-light">
                     
-                    <div class="mb-3">
-                        <label class="fw-bold form-label">Escuela / Cliente</label>
+                    <div class="mb-4">
+                        <label class="fw-bold form-label">Escuela / Destino</label>
                         <select class="form-select form-select-lg" x-model="form.client_id">
                             <option value="">Seleccionar Escuela...</option>
                             @foreach($clients as $client)
@@ -31,36 +31,20 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="fw-bold form-label text-success">
-                            <i class="bi bi-cash-coin"></i> Servicio a Facturar
-                        </label>
-                        <select class="form-select border-success" x-model="form.menu_type">
-                            <option value="">Seleccionar Servicio...</option>
-                            <option value="Comedor">Comedor (Almuerzo)</option>
-                            <option value="DMC">DMC (Desayuno/Merienda)</option>
-                            <option value="Maternal">Maternal</option>
-                            <option value="Listo Consumo">Listo Consumo</option>
-                            <option value="Extra">Entrega Extra (Sin Cargo)</option>
-                        </select>
-                        <div class="form-text small text-muted">
-                            Define qué cupo se cobrará en el Balance Financiero.
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
                         <label class="fw-bold form-label">Fecha de Entrega</label>
                         <input type="date" class="form-control" x-model="form.date">
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Observación</label>
-                        <textarea class="form-control" rows="2" x-model="form.observation" placeholder="Ej: Refuerzo solicitado..."></textarea>
+                        <label class="fw-bold form-label">Observaciones</label>
+                        <textarea class="form-control" rows="4" x-model="form.observation" 
+                                  placeholder="Ej: Se entregó mercadería extra por pedido de la directora..."></textarea>
                     </div>
                 </div>
                 <div class="card-footer bg-white border-0 p-3">
                     <button class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-sm" 
                             @click="submitOrder" 
-                            :disabled="cart.length === 0 || !form.client_id || !form.menu_type">
+                            :disabled="cart.length === 0 || !form.client_id">
                         <i class="bi bi-check-lg"></i> CONFIRMAR SALIDA
                     </button>
                 </div>
@@ -142,40 +126,34 @@ function scannerApp() {
     return {
         form: {
             client_id: '',
-            menu_type: '',
             date: new Date().toISOString().slice(0, 10),
             observation: ''
         },
         cart: [],
-        // Mapeamos los productos de PHP a JS para búsqueda rápida
         products: @json($products->map(fn($p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name])), 
 
         addProduct(val) {
             if (!val) return;
 
-            // Buscamos por Código de Barras (Prioridad) o por Nombre exacto
             let product = this.products.find(p => p.code == val || p.name == val);
 
             if (product) {
-                // Si ya existe en la lista, sumamos 1
                 let existing = this.cart.find(c => c.id == product.id);
                 if (existing) {
                     existing.qty = parseFloat(existing.qty) + 1;
                 } else {
-                    // Si es nuevo, lo agregamos
-                    this.cart.unshift({ // unshift lo pone al principio de la lista
+                    this.cart.unshift({ 
                         id: product.id, 
                         name: product.name, 
                         qty: 1 
                     });
                 }
                 
-                // Limpiamos y re-enfocamos para escanear el siguiente rápido
                 let input = document.getElementById('scannerInput');
                 input.value = ''; 
                 input.focus();
             } else {
-                alert('Producto no encontrado con el código: ' + val);
+                alert('Producto no encontrado: ' + val);
                 document.getElementById('scannerInput').value = '';
             }
         },
@@ -185,24 +163,21 @@ function scannerApp() {
         },
 
         submitOrder() {
-            if(!this.form.client_id || !this.form.menu_type) {
-                alert('Faltan datos obligatorios (Escuela o Tipo de Servicio).');
+            if(!this.form.client_id) {
+                alert('Selecciona una Escuela.');
                 return;
             }
 
-            if(!confirm('¿Confirmar salida? Se descontará del stock inmediatamente.')) return;
+            if(!confirm('¿Confirmar salida? Se descontará del stock.')) return;
 
-            // Datos a enviar
             let payload = {
                 client_id: this.form.client_id,
-                menu_type: this.form.menu_type,
                 date: this.form.date,
                 observation: this.form.observation,
                 items: this.cart,
                 _token: '{{ csrf_token() }}'
             };
 
-            // Envío AJAX
             fetch('{{ route("ordenes.storeReal") }}', {
                 method: 'POST',
                 headers: { 
@@ -214,15 +189,12 @@ function scannerApp() {
             .then(res => res.json())
             .then(data => {
                 if(data.success) {
-                    alert('✅ ENTREGA REGISTRADA CORRECTAMENTE');
-                    // Limpiamos todo para la siguiente entrega
+                    alert('✅ ENTREGA REGISTRADA');
                     this.cart = [];
                     this.form.client_id = '';
                     this.form.observation = '';
-                    // Opcional: Recargar la página si prefieres
-                    // window.location.reload(); 
                 } else {
-                    alert('❌ Error al guardar: ' + (data.message || 'Desconocido'));
+                    alert('❌ Error: ' + data.message);
                 }
             })
             .catch(error => {

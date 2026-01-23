@@ -10,7 +10,7 @@ class Client extends Model
     use HasFactory;
 
     protected $fillable = [
-        // Datos de Contacto e Identificación
+        // 1. Datos de Contacto e Identificación
         'name', 
         'address',
         'phone',
@@ -18,23 +18,20 @@ class Client extends Model
         'cuit',
         'level',   
 
-        // Cupos por Nivel (Usados para cálculo de cantidades en recetas)
-        'cupo_jardin', 
-        'cupo_primaria', 
-        'cupo_secundaria',
+        // 2. CUPOS OPERATIVOS (Por Tipo de Servicio)
+        // Estos son los que definen cuánta comida se prepara y cobra
+        'quota_comedor',      // Comedor Estándar
+        'quota_dmc',          // Desayuno/Merienda
+        'quota_comedor_alt',  // Comedor Alternativo
+        'quota_dmc_alt',      // DMC Alternativo
+        'quota_lcb',          // Listo Consumo (Antes quota_listo)
+        'quota_maternal',
 
-        // Valores Financieros (NUEVO: Para el Balance)
+        // 3. VALORES / PRECIOS (Opcional)
+        // Si esta escuela tiene un precio distinto al general
         'valor_dmc', 
         'valor_comedor', 
         'valor_lc',
-
-        // Cupos Específicos (Legado/Otros)
-        'quota_dmc', 
-        'quota_dmc_alt', 
-        'quota_comedor', 
-        'quota_comedor_alt', 
-        'quota_listo', 
-        'quota_maternal',
     ];
 
     /**
@@ -43,5 +40,13 @@ class Client extends Model
     public function remitos()
     {
         return $this->hasMany(Remito::class);
+    }
+
+    /**
+     * Relación con las órdenes de entrega (Salida de Depósito)
+     */
+    public function ordenes()
+    {
+        return $this->hasMany(OrdenEntrega::class);
     }
 }

@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
-use App\Models\OrdenEntrega; // <--- CAMBIO: Usamos OrdenEntrega (Real), no Remito (Papel)
-use App\Models\GlobalPrice;
+use App\Models\OrdenEntrega;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -12,83 +11,71 @@ class BalanceController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. PRECIOS GLOBALES (Valor por cupo)
-        $precios = GlobalPrice::firstOrCreate([], ['valor_dmc'=>0, 'valor_comedor'=>0, 'valor_lc'=>0]);
+        // 1. Configuración de fechas
+        $fechaInicio = $request->date_start ? Carbon::parse($request->date_start) : Carbon::now()->startOfMonth();
+        $fechaFin    = $request->date_end   ? Carbon::parse($request->date_end)   : Carbon::now()->endOfMonth();
 
-        // 2. FILTROS DE FECHA
-        $fechaInicio = $request->input('date_start', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $fechaFin    = $request->input('date_end', Carbon::now()->endOfMonth()->format('Y-m-d'));
-
-        $clients = Client::orderBy('name')->get();
         $balanceData = [];
+        $clientes = Client::orderBy('name')->get();
 
-        foreach ($clients as $client) {
+        foreach ($clientes as $client) {
             
-            $ingresoTotal = 0;
-            $gastoTotal = 0;
+            $ingresosTotales = 0;
+            $gastosTotales = 0;
             $cantidadServicios = 0;
-
-            // 3. BUSCAMOS LAS ÓRDENES DE ENTREGA (REALES)
-            // Traemos las órdenes junto con sus detalles (ingredientes/productos) para calcular costos
-            $ordenes = OrdenEntrega::with(['details.ingredient', 'details.product'])
-                                   ->where('client_id', $client->id)
-                                   ->whereBetween('date', [$fechaInicio, $fechaFin])
-                                   ->get();
+            
+            // 2. Buscamos las órdenes de entrega del periodo para esta escuela
+            $ordenes = OrdenEntrega::with(['details.product'])
+                ->where('client_id', $client->id)
+                ->whereBetween('date', [$fechaInicio, $fechaFin])
+                ->get();
 
             foreach ($ordenes as $orden) {
-                // --- A. CÁLCULO DE INGRESOS (Según Tipo de Menú y Cupo de Escuela) ---
-                // Solo si la orden tiene un tipo de menú definido (Comedor, DMC, etc.)
-                if ($orden->menu_type) {
-                    $cantidadServicios++;
-                    $tipoMenu = $orden->menu_type;
-                    $ingresoOrden = 0;
-
-                    // Lógica: Cupo de la Escuela * Precio Global
-                    if (in_array($tipoMenu, ['Comedor', 'Comedor Alternativo'])) {
-                        $cupo = $client->quota_comedor + $client->quota_comedor_alt; 
-                        $ingresoOrden = $cupo * $precios->valor_comedor;
-                    } 
-                    elseif (in_array($tipoMenu, ['DMC', 'DMC Alternativo'])) {
-                        $cupo = $client->quota_dmc + $client->quota_dmc_alt;
-                        $ingresoOrden = $cupo * $precios->valor_dmc;
-                    }
-                    elseif ($tipoMenu == 'Maternal') {
-                        $cupo = $client->quota_maternal;
-                        $ingresoOrden = $cupo * $precios->valor_dmc; // Asumiendo valor DMC
-                    }
-                    elseif ($tipoMenu == 'Listo Consumo') {
-                        $cupo = $client->quota_listo;
-                        $ingresoOrden = $cupo * $precios->valor_lc;
-                    }
-
-                    $ingresoTotal += $ingresoOrden;
-                }
-
-                // --- B. CÁLCULO DE GASTOS (Costo de Mercadería Real Entregada) ---
+                
+                // --- A. CALCULAR GASTOS (Mercadería real que salió) ---
                 foreach ($orden->details as $detail) {
-                    $cantidad = $detail->quantity;
-                    $costoUnitario = 0;
-
-                    if ($detail->ingredient) {
-                        $costoUnitario = $detail->ingredient->cost ?? 0; 
-                    } elseif ($detail->product) {
-                        $costoUnitario = $detail->product->cost ?? 0; 
+                    if ($detail->product) {
+                        $costoProd = $detail->product->price_per_unit ?? 0; 
+                        $gastosTotales += ($detail->quantity * $costoProd);
                     }
-                    
-                    $gastoTotal += ($cantidad * $costoUnitario);
                 }
+
+                // --- B. CALCULAR INGRESOS (Día hábil: se suman todos los cupos activos) ---
+                // Sumamos Comedor si tiene cupo
+                if ($client->quota_comedor > 0) {
+                    $ingresosTotales += ($client->quota_comedor * ($client->valor_comedor ?? 0));
+                }
+
+                // Sumamos DMC si tiene cupo
+                if ($client->quota_dmc > 0) {
+                    $ingresosTotales += ($client->quota_dmc * ($client->valor_dmc ?? 0));
+                }
+
+                // Sumamos Listo para Consumo si tiene cupo
+                if ($client->quota_lcb > 0) {
+                    $ingresosTotales += ($client->quota_lcb * ($client->valor_lc ?? 0));
+                }
+
+                // Sumamos Maternal u otros si existen en tu tabla de clientes
+                if (isset($client->quota_maternal) && $client->quota_maternal > 0) {
+                    $ingresosTotales += ($client->quota_maternal * ($client->valor_comedor ?? 0));
+                }
+
+                $cantidadServicios++; 
             }
 
-            // --- C. RESULTADO FINAL ---
-            $balanceData[] = [
-                'cliente'   => $client->name,
-                'servicios' => $cantidadServicios,
-                'ingresos'  => $ingresoTotal,
-                'gastos'    => $gastoTotal,
-                'balance'   => $ingresoTotal - $gastoTotal
-            ];
+            // 3. Solo agregamos al reporte si hubo movimiento (Orden de entrega generada)
+            if ($ordenes->count() > 0) {
+                $balanceData[] = [
+                    'cliente'   => $client->name,
+                    'servicios' => $cantidadServicios, // Representa los días de entrega
+                    'ingresos'  => $ingresosTotales,
+                    'gastos'    => $gastosTotales,
+                    'balance'   => $ingresosTotales - $gastosTotales
+                ];
+            }
         }
 
-        return view('balance.index', compact('balanceData', 'precios', 'fechaInicio', 'fechaFin'));
+        return view('balance.index', compact('balanceData', 'fechaInicio', 'fechaFin'));
     }
 }
