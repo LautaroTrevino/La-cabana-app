@@ -2,151 +2,102 @@
 
 @section('content')
 <div class="container py-4">
-    <h2 class="fw-bold mb-4">Generar Remito de Menús</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-gray-800">
+            <i class="bi bi-file-earmark-text text-primary"></i> Generar Nuevo Remito
+        </h2>
+        <a href="{{ route('remitos.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+    </div>
 
-    <form action="{{ route('remitos.storeOficial') }}" method="POST" id="remitoForm">
-        @csrf
-        
-        <div class="row">
-            {{-- COLUMNA IZQUIERDA: CONFIGURACIÓN --}}
-            <div class="col-md-5">
-                <div class="card shadow-sm border-0 mb-3">
-                    <div class="card-header bg-white fw-bold">1. Datos del Cliente</div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Escuela / Cliente</label>
-                            <select name="client_id" class="form-select" required>
-                                <option value="">Seleccione...</option>
-                                @foreach($clients as $client)
-                                    <option value="{{ $client->id }}">
-                                        {{ $client->name }} ({{ ucfirst($client->level) }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Fecha del Remito</label>
-                            <input type="date" name="date" class="form-control" value="{{ date('Y-m-d') }}" required>
-                        </div>
-                    </div>
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white fw-bold py-3">
+                    Configuración del Envío
                 </div>
+                <div class="card-body bg-light">
+                    
+                    <form action="{{ route('remitos.store') }}" method="POST">
+                        @csrf
 
-                <div class="card shadow-sm border-0 bg-primary text-white">
-                    <div class="card-body">
-                        <h5 class="fw-bold"><i class="bi bi-basket"></i> 2. Agregar Menús</h5>
-                        <p class="small text-white-50">Selecciona los servicios que se entregarán en este remito.</p>
-                        
-                        <div class="input-group mb-3">
-                            <select id="menuSelector" class="form-select text-dark">
-                                <option value="">Elegir Menú...</option>
-                                @foreach($menus as $menu)
-                                    <option value="{{ $menu->id }}" data-name="{{ $menu->name }}" data-type="{{ $menu->type }}">
-                                        {{ $menu->type }} - Día {{ $menu->day_number }} - {{ $menu->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <button type="button" class="btn btn-light fw-bold text-primary" onclick="agregarMenu()">
-                                <i class="bi bi-plus-lg"></i> Agregar
+                        {{-- 1. SELECCIÓN DE ESCUELA --}}
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold">1. Seleccionar Escuela (Destino)</label>
+                                <select name="client_id" class="form-select form-select-lg shadow-sm" required>
+                                    <option value="">Elegir escuela...</option>
+                                    @foreach($clients as $client)
+                                        <option value="{{ $client->id }}">
+                                            {{ $client->name }} 
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">2. Fecha de Entrega</label>
+                                <input type="date" name="date" class="form-control form-control-lg" value="{{ date('Y-m-d') }}" required>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        {{-- 2. SELECCIÓN DE MENÚS (AGRUPADOS) --}}
+                        <div class="mb-4">
+                            <label class="form-label fw-bold mb-3 fs-5">3. Seleccionar Menús a Preparar</label>
+                            
+                            @if($menus->isEmpty())
+                                <div class="alert alert-warning">
+                                    No hay menús cargados. Ve a la sección "Menús" para crear los ciclos (Lunes 1, Martes 2, etc).
+                                </div>
+                            @else
+                                <div class="row g-3">
+                                    {{-- AGRUPAMOS AUTOMÁTICAMENTE POR TIPO DE MENÚ --}}
+                                    @foreach($menus->groupBy('type') as $tipo => $menusDelTipo)
+                                        <div class="col-md-6">
+                                            <div class="card h-100 border-0 shadow-sm">
+                                                <div class="card-header fw-bold text-uppercase bg-dark text-white text-center">
+                                                    {{ $tipo }}
+                                                </div>
+                                                <div class="card-body p-0">
+                                                    <div class="list-group list-group-flush">
+                                                        @foreach($menusDelTipo as $menu)
+                                                            <label class="list-group-item list-group-item-action d-flex gap-3 align-items-center cursor-pointer">
+                                                                <input class="form-check-input flex-shrink-0" type="checkbox" name="menus[]" value="{{ $menu->id }}" style="transform: scale(1.3);">
+                                                                <span class="pt-1 form-checked-content w-100">
+                                                                    <strong class="d-block">{{ $menu->name }}</strong>
+                                                                    {{-- Muestra ingredientes resumidos si quieres --}}
+                                                                    <small class="text-muted" style="font-size: 0.8em;">
+                                                                        {{ $menu->ingredients->count() }} ingrediente(s)
+                                                                    </small>
+                                                                </span>
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                            
+                            <div class="form-text mt-3">
+                                <i class="bi bi-info-circle"></i> Marca los menús correspondientes al día de la fecha. El sistema usará el cupo adecuado (Comedor, DMC, etc.) automáticamente.
+                            </div>
+                        </div>
+
+                        <div class="d-grid pt-3">
+                            <button type="submit" class="btn btn-success btn-lg fw-bold shadow py-3">
+                                <i class="bi bi-calculator"></i> CALCULAR Y GENERAR REMITO
                             </button>
                         </div>
-                    </div>
-                </div>
-            </div>
 
-            {{-- COLUMNA DERECHA: LISTA DE MENÚS SELECCIONADOS --}}
-            <div class="col-md-7">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                        <span>3. Menús a Procesar</span>
-                        <span class="badge bg-secondary" id="countBadge">0</span>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-striped mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Servicio</th>
-                                        <th>Menú</th>
-                                        <th class="text-end">Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="listaMenus">
-                                    {{-- Aquí se agregan los menús con JS --}}
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <div id="emptyState" class="text-center py-5 text-muted">
-                            <i class="bi bi-arrow-left-circle fs-1"></i>
-                            <p class="mt-2">Agrega menús desde el panel izquierdo.</p>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-white py-3 text-end">
-                        <button type="submit" class="btn btn-success btn-lg fw-bold px-4" id="btnGenerar" disabled>
-                            <i class="bi bi-check-lg"></i> Generar Remito
-                        </button>
-                    </div>
+                    </form>
+
                 </div>
             </div>
         </div>
-    </form>
+    </div>
 </div>
-
-<script>
-    function agregarMenu() {
-        const selector = document.getElementById('menuSelector');
-        const id = selector.value;
-        
-        if(!id) return; // Si no eligió nada, salir
-
-        const option = selector.options[selector.selectedIndex];
-        const name = option.getAttribute('data-name');
-        const type = option.getAttribute('data-type');
-
-        // Validar que no esté ya agregado
-        if(document.getElementById('menu-row-' + id)) {
-            alert('Este menú ya está en la lista.');
-            return;
-        }
-
-        const tbody = document.getElementById('listaMenus');
-        const row = document.createElement('tr');
-        row.id = 'menu-row-' + id;
-        
-        row.innerHTML = `
-            <td><span class="badge bg-info text-dark">${type}</span></td>
-            <td class="fw-bold">${name}</td>
-            <td class="text-end">
-                <input type="hidden" name="menu_ids[]" value="${id}">
-                <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="eliminarFila('${id}')">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </td>
-        `;
-
-        tbody.appendChild(row);
-        actualizarEstado();
-        selector.value = ""; // Resetear selector
-    }
-
-    function eliminarFila(id) {
-        document.getElementById('menu-row-' + id).remove();
-        actualizarEstado();
-    }
-
-    function actualizarEstado() {
-        const tbody = document.getElementById('listaMenus');
-        const count = tbody.children.length;
-        
-        document.getElementById('countBadge').innerText = count;
-        
-        if(count > 0) {
-            document.getElementById('emptyState').classList.add('d-none');
-            document.getElementById('btnGenerar').disabled = false;
-        } else {
-            document.getElementById('emptyState').classList.remove('d-none');
-            document.getElementById('btnGenerar').disabled = true;
-        }
-    }
-</script>
 @endsection

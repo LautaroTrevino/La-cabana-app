@@ -17,20 +17,15 @@
             </div>
             <div class="no-print">
                 {{-- Badge de Tipo de Operación --}}
-                @if($remito->tipo == 'entrega')
-                    <span class="badge bg-dark p-2">
-                        <i class="bi bi-truck"></i> ENTREGA REAL (Depósito)
-                    </span>
-                @else
+                @if(isset($remito->menu_type))
                     <span class="badge bg-primary p-2">
                         <i class="bi bi-file-earmark-text"></i> REMITO ADMINISTRATIVO (Menú)
                     </span>
+                @else
+                    <span class="badge bg-dark p-2">
+                        <i class="bi bi-truck"></i> ENTREGA REAL (Depósito)
+                    </span>
                 @endif
-                
-                {{-- Badge de Estado --}}
-                <span class="badge {{ $remito->status == 'active' ? 'bg-success' : 'bg-danger' }} p-2 ms-2">
-                    {{ strtoupper($remito->status == 'active' ? 'VIGENTE' : 'ANULADO') }}
-                </span>
             </div>
         </div>
         
@@ -41,7 +36,6 @@
                     <h6 class="text-muted text-uppercase small fw-bold mb-3">Datos del Destinatario</h6>
                     <div class="p-3 bg-light rounded border">
                         <h5 class="mb-1">{{ $remito->client->name }}</h5>
-                        <span class="badge bg-secondary mb-2">{{ strtoupper($remito->client->level) }}</span>
                         <p class="mb-1 text-muted small">
                             <i class="bi bi-geo-alt"></i> {{ $remito->client->address ?? 'Sin dirección registrada' }}
                         </p>
@@ -67,28 +61,29 @@
                         <tr>
                             <th>Artículo / Ingrediente</th>
                             <th class="text-center" style="width: 200px;">Cantidad Total</th>
+                            <th class="text-muted small">Referencia</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($remito->details as $detail)
+                        {{-- CAMBIO CLAVE: Usamos $remito->items en lugar de $remito->details --}}
+                        @forelse($remito->items as $item)
                             <tr>
                                 <td>
-                                    @if($detail->ingredient_id)
-                                        {{-- Si es un ingrediente de menú --}}
-                                        <div class="fw-bold">{{ $detail->ingredient->name }}</div>
-                                        <small class="text-muted">{{ $detail->ingredient->description ?? 'Ingrediente de receta' }}</small>
-                                    @else
-                                        {{-- Si es un producto de stock --}}
-                                        <div class="fw-bold">{{ $detail->product->name }}</div>
-                                        <small class="text-muted">{{ $detail->product->brand }} | {{ $detail->product->presentation }}</small>
-                                    @endif
+                                    <div class="fw-bold">{{ $item->name }}</div>
                                 </td>
                                 <td class="text-center fs-5 fw-bold">
-                                    {{ number_format($detail->quantity, 3, ',', '.') }}
-                                    <small class="text-muted fs-6">un/kg</small>
+                                    {{ number_format($item->quantity, 2, ',', '.') }}
+                                    <small class="text-muted fs-6">{{ $item->unit }}</small>
+                                </td>
+                                <td class="text-muted small">
+                                    {{ $item->observation ?? 'Entrega directa' }}
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="3" class="text-center py-4 text-muted">No hay ítems registrados en este remito.</td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
@@ -99,11 +94,9 @@
             <button onclick="window.print();" class="btn btn-outline-dark me-2">
                 <i class="bi bi-printer"></i> Imprimir Pantalla
             </button>
-            @if(Route::has('remitos.print'))
             <a href="{{ route('remitos.print', $remito->id) }}" target="_blank" class="btn btn-primary px-4">
                 <i class="bi bi-file-pdf"></i> Generar PDF Oficial
             </a>
-            @endif
         </div>
     </div>
 </div>

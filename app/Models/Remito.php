@@ -9,21 +9,17 @@ class Remito extends Model
 {
     use HasFactory;
 
-    // IMPORTANTE: Estos nombres deben coincidir EXACTAMENTE con tu migración
-    protected $fillable = [
-        'client_id', 
-        'number', 
-        'date', 
-        'tipo', 
-        'observation', 
-        'status'
-    ];
+    protected $fillable = ['client_id', 'date', 'number', 'status', 'observation'];
 
-    public function client() {
+    // Relación con la Escuela
+    public function client()
+    {
         return $this->belongsTo(Client::class);
     }
 
-    public function details() {
-        return $this->hasMany(RemitoDetail::class);
+    // ESTA ES LA FUNCIÓN QUE FALTABA Y CAUSABA EL ERROR
+    public function items()
+    {
+        return $this->hasMany(RemitoItem::class);
     }
 }

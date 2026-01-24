@@ -7,14 +7,13 @@ use App\Http\Controllers\MenuController;
 use App\Http\Controllers\IngredientController;
 use App\Http\Controllers\ClientController; 
 use App\Http\Controllers\BalanceController;
-use App\Http\Controllers\OrdenEntregaController; // <--- AGREGADO
+use App\Http\Controllers\OrdenEntregaController; 
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
 
 /*
 |--------------------------------------------------------------------------
-| Rutas Web
+| Rutas Web - La Cabaña App
 |--------------------------------------------------------------------------
 */
 
@@ -24,7 +23,7 @@ Route::get('/', function () {
 
 Route::middleware('auth')->group(function () {
     
-    // --- DASHBOARD ---
+    // DASHBOARD
     Route::get('/dashboard', function () {
         return redirect()->route('products.index');
     })->middleware('verified')->name('dashboard');
@@ -35,19 +34,18 @@ Route::middleware('auth')->group(function () {
     Route::post('/products/{id}/movement', [ProductController::class, 'storeMovement'])->name('products.movement');
     Route::get('/historial', [ProductController::class, 'history'])->name('history.index');
 
-    // 2. DEPÓSITO (SALIDA REAL DE MERCADERÍA)
-    // Pantalla del Escáner
+    // 2. DEPÓSITO (SALIDA REAL)
     Route::get('/deposito/salida', [OrdenEntregaController::class, 'create'])->name('ordenes.create');
-    // Guardar la salida y descontar stock
     Route::post('/deposito/guardar-real', [OrdenEntregaController::class, 'storeReal'])->name('ordenes.storeReal');
 
-    // 3. REMITOS (DOCUMENTACIÓN ADMINISTRATIVA)
+    // 3. REMITOS (DOCUMENTACIÓN)
+    // Orden importante: Rutas específicas primero, luego las genéricas
+    Route::get('/remitos/crear', [RemitoController::class, 'create'])->name('remitos.create'); // Soluciona el 404
+    Route::post('/remitos/store-menu', [RemitoController::class, 'storeMenu'])->name('remitos.storeMenu');
+    Route::post('/remitos', [RemitoController::class, 'store'])->name('remitos.store');
     Route::get('/remitos', [RemitoController::class, 'index'])->name('remitos.index');
     Route::get('/remitos/{remito}', [RemitoController::class, 'show'])->name('remitos.show');
     Route::get('/remitos/{remito}/print', [RemitoController::class, 'print'])->name('remitos.print');
-    Route::post('/remitos/store-menu', [RemitoController::class, 'storeMenu'])->name('remitos.storeMenu');
-    Route::get('/remitos/crear', [RemitoController::class, 'create'])->name('remitos.create');
-    Route::post('/remitos', [RemitoController::class, 'store'])->name('remitos.store');
 
     // 4. MENÚS
     Route::resource('menus', MenuController::class);
@@ -56,10 +54,9 @@ Route::middleware('auth')->group(function () {
 
     // 5. BALANCE
     Route::get('/balance', [BalanceController::class, 'index'])->name('balance.index');
+    Route::post('/balance/update-prices', [BalanceController::class, 'updatePrices'])->name('balance.updatePrices');
 
     // 6. CLIENTES (ESCUELAS)
-    Route::put('/clients/update-global-prices', [ClientController::class, 'updateGlobalPrices'])
-        ->name('clients.updateGlobalPrices');
     Route::resource('clients', ClientController::class);
 
     // 7. ADMIN USUARIOS

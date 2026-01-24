@@ -28,6 +28,7 @@
                                 <option value="{{ $client->id }}">{{ $client->name }}</option>
                             @endforeach
                         </select>
+                        <div class="form-text small">¿A dónde va la mercadería?</div>
                     </div>
 
                     <div class="mb-4">
@@ -38,7 +39,7 @@
                     <div class="mb-3">
                         <label class="fw-bold form-label">Observaciones</label>
                         <textarea class="form-control" rows="4" x-model="form.observation" 
-                                  placeholder="Ej: Se entregó mercadería extra por pedido de la directora..."></textarea>
+                                  placeholder="Ej: Refuerzo solicitado por la directora..."></textarea>
                     </div>
                 </div>
                 <div class="card-footer bg-white border-0 p-3">
@@ -130,18 +131,22 @@ function scannerApp() {
             observation: ''
         },
         cart: [],
+        // Mapeamos los productos para que JS los entienda
         products: @json($products->map(fn($p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name])), 
 
         addProduct(val) {
             if (!val) return;
 
+            // Buscamos por código O por nombre
             let product = this.products.find(p => p.code == val || p.name == val);
 
             if (product) {
+                // Si ya está en la lista, sumamos 1
                 let existing = this.cart.find(c => c.id == product.id);
                 if (existing) {
                     existing.qty = parseFloat(existing.qty) + 1;
                 } else {
+                    // Si no, lo agregamos
                     this.cart.unshift({ 
                         id: product.id, 
                         name: product.name, 
@@ -149,6 +154,7 @@ function scannerApp() {
                     });
                 }
                 
+                // Limpiamos el input y devolvemos el foco para el siguiente escaneo
                 let input = document.getElementById('scannerInput');
                 input.value = ''; 
                 input.focus();
@@ -164,11 +170,11 @@ function scannerApp() {
 
         submitOrder() {
             if(!this.form.client_id) {
-                alert('Selecciona una Escuela.');
+                alert('⚠️ Por favor, selecciona una Escuela.');
                 return;
             }
 
-            if(!confirm('¿Confirmar salida? Se descontará del stock.')) return;
+            if(!confirm('¿Confirmar salida? Se descontará del stock inmediatamente.')) return;
 
             let payload = {
                 client_id: this.form.client_id,
@@ -189,7 +195,8 @@ function scannerApp() {
             .then(res => res.json())
             .then(data => {
                 if(data.success) {
-                    alert('✅ ENTREGA REGISTRADA');
+                    alert('✅ ENTREGA REGISTRADA EXITOSAMENTE');
+                    // Reseteamos el formulario
                     this.cart = [];
                     this.form.client_id = '';
                     this.form.observation = '';
@@ -199,7 +206,7 @@ function scannerApp() {
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error de conexión.');
+                alert('Error de conexión con el servidor.');
             });
         }
     }

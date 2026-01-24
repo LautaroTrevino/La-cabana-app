@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
-use App\Models\GlobalPrice;
 use Illuminate\Http\Request;
 
 class ClientController extends Controller
@@ -11,25 +10,7 @@ class ClientController extends Controller
     public function index()
     {
         $clients = Client::orderBy('name')->get(); 
-        
-        // Enviamos precios para el modal de configuración rápida
-        $prices = GlobalPrice::firstOrCreate([], ['valor_dmc'=>0, 'valor_comedor'=>0, 'valor_lc'=>0]);
-
-        return view('clients.index', compact('clients', 'prices'));
-    }
-
-    public function updateGlobalPrices(Request $request)
-    {
-        $request->validate([
-            'valor_dmc'     => 'required|numeric|min:0',
-            'valor_comedor' => 'required|numeric|min:0',
-            'valor_lc'      => 'required|numeric|min:0',
-        ]);
-
-        $prices = GlobalPrice::first();
-        $prices->update($request->all());
-
-        return back()->with('success', '¡Precios globales actualizados!');
+        return view('clients.index', compact('clients'));
     }
 
     public function create()
@@ -39,28 +20,35 @@ class ClientController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'level' => 'required|string',
+        // 1. Validamos los datos
+        $validated = $request->validate([
+            'name'    => 'required|string|max:255',
             'address' => 'nullable|string|max:255',
-            'cuit' => 'nullable|string|max:20',
+            'cuit'    => 'nullable|string|max:20',
+            'phone'   => 'nullable|string|max:20',
+            'email'   => 'nullable|email|max:255',
             
-            // CUPOS DE SERVICIO (Para Balance / Facturación)
-            'quota_dmc'         => 'nullable|integer|min:0',
-            'quota_dmc_alt'     => 'nullable|integer|min:0',
+            // Cupos (pueden venir nulos del formulario)
             'quota_comedor'     => 'nullable|integer|min:0',
             'quota_comedor_alt' => 'nullable|integer|min:0',
+            'quota_dmc'         => 'nullable|integer|min:0',
+            'quota_dmc_alt'     => 'nullable|integer|min:0',
+            'quota_lcb'         => 'nullable|integer|min:0',
             'quota_maternal'    => 'nullable|integer|min:0',
-            'quota_listo'       => 'nullable|integer|min:0',
-
-            // CUPOS OPERATIVOS (Para cálculo de ingredientes en cocina)
-            // Se mantienen para saber cuánto mandar de base si el menú es genérico
-            'cupo_jardin'     => 'nullable|integer|min:0',
-            'cupo_primaria'   => 'nullable|integer|min:0',
-            'cupo_secundaria' => 'nullable|integer|min:0',
         ]);
 
-        Client::create($request->all());
+        // 2. CORRECCIÓN: Convertimos cualquier nulo en 0 antes de guardar
+        $cuposLimpios = [
+            'quota_comedor'     => $request->quota_comedor ?? 0,
+            'quota_comedor_alt' => $request->quota_comedor_alt ?? 0,
+            'quota_dmc'         => $request->quota_dmc ?? 0,
+            'quota_dmc_alt'     => $request->quota_dmc_alt ?? 0,
+            'quota_lcb'         => $request->quota_lcb ?? 0,
+            'quota_maternal'    => $request->quota_maternal ?? 0,
+        ];
+
+        // Fusionamos los datos validados con los cupos limpios (que ahora son ceros si estaban vacíos)
+        Client::create(array_merge($validated, $cuposLimpios));
 
         return redirect()->route('clients.index')->with('success', 'Escuela creada exitosamente.');
     }
@@ -72,27 +60,36 @@ class ClientController extends Controller
 
     public function update(Request $request, Client $client)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
+        // 1. Validamos
+        $validated = $request->validate([
+            'name'    => 'required|string|max:255',
             'address' => 'nullable|string|max:255',
-            'cuit' => 'nullable|string|max:20',
+            'cuit'    => 'nullable|string|max:20',
+            'phone'   => 'nullable|string|max:20',
+            'email'   => 'nullable|email|max:255',
 
-            // Validación de Cupos
-            'quota_dmc'         => 'nullable|integer|min:0',
-            'quota_dmc_alt'     => 'nullable|integer|min:0',
             'quota_comedor'     => 'nullable|integer|min:0',
             'quota_comedor_alt' => 'nullable|integer|min:0',
+            'quota_dmc'         => 'nullable|integer|min:0',
+            'quota_dmc_alt'     => 'nullable|integer|min:0',
+            'quota_lcb'         => 'nullable|integer|min:0',
             'quota_maternal'    => 'nullable|integer|min:0',
-            'quota_listo'       => 'nullable|integer|min:0',
-
-            'cupo_jardin'     => 'nullable|integer|min:0',
-            'cupo_primaria'   => 'nullable|integer|min:0',
-            'cupo_secundaria' => 'nullable|integer|min:0',
         ]);
         
-        $client->update($request->all());
+        // 2. CORRECCIÓN: Convertimos nulos en 0
+        $cuposLimpios = [
+            'quota_comedor'     => $request->quota_comedor ?? 0,
+            'quota_comedor_alt' => $request->quota_comedor_alt ?? 0,
+            'quota_dmc'         => $request->quota_dmc ?? 0,
+            'quota_dmc_alt'     => $request->quota_dmc_alt ?? 0,
+            'quota_lcb'         => $request->quota_lcb ?? 0,
+            'quota_maternal'    => $request->quota_maternal ?? 0,
+        ];
 
-        return redirect()->route('clients.index')->with('success', 'Cupos actualizados correctamente.');
+        // Actualizamos con los datos seguros
+        $client->update(array_merge($validated, $cuposLimpios));
+
+        return redirect()->route('clients.index')->with('success', 'Datos actualizados correctamente.');
     }
 
     public function destroy(Client $client)

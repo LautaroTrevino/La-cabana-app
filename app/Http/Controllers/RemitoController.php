@@ -3,243 +3,116 @@
 namespace App\Http\Controllers;
 
 use App\Models\Remito;
-use App\Models\RemitoDetail;
 use App\Models\Client;
-use App\Models\Product;
-use App\Models\Ingredient;
+use App\Models\Menu;
+use App\Models\OrdenEntrega; 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Barryvdh\DomPDF\Facade\Pdf;
-use App\Models\Menu; 
+use Barryvdh\DomPDF\Facade\Pdf; 
 
 class RemitoController extends Controller
 {
-    /**
-     * LISTADO PRINCIPAL
-     */
-    public function index(Request $request) 
+    // 1. LISTADO MIXTO (REMITOS Y ENTREGAS)
+    public function index(Request $request)
     {
-        // 1. Consulta base
-        $query = Remito::with(['client', 'details.product', 'details.ingredient'])->latest();
-
-        // 2. Filtros
-        if ($request->filled('client_id')) {
-            $query->where('client_id', $request->client_id);
-        }
-
-        if ($request->filled('date_search')) {
-            $query->whereDate('date', $request->date_search);
-        } elseif ($request->filled('date_start') && $request->filled('date_end')) {
-            $query->whereBetween('date', [$request->date_start, $request->date_end]);
-        }
-
-        // 3. Separar colecciones para las pestañas de la vista
-        $entregas = (clone $query)->where('tipo', 'entrega')->get();
-        $remitosAdmin = (clone $query)->where('tipo', 'remito')->get();
-        
         $clients = Client::orderBy('name')->get();
-        $menus = Menu::orderBy('name')->get(); 
-        
-        return view('remitos.index', compact('entregas', 'remitosAdmin', 'clients', 'menus'));
+
+        $queryRemitos = Remito::with('client')->orderBy('date', 'desc');
+        $queryEntregas = OrdenEntrega::with(['client', 'details'])->orderBy('date', 'desc');
+
+        // Filtros
+        if ($request->has('client_id') && $request->client_id != '') {
+            $queryRemitos->where('client_id', $request->client_id);
+            $queryEntregas->where('client_id', $request->client_id);
+        }
+
+        if ($request->has('date_search') && $request->date_search != '') {
+            $queryRemitos->whereDate('date', $request->date_search);
+            $queryEntregas->whereDate('date', $request->date_search);
+        }
+
+        $remitos = $queryRemitos->get();
+        $entregas = $queryEntregas->get();
+
+        return view('remitos.index', compact('remitos', 'entregas', 'clients'));
     }
 
-    // --- FLUJO ADMINISTRATIVO (Manual) ---
+    // 2. FORMULARIO PARA CREAR NUEVO REMITO
     public function create()
     {
         $clients = Client::orderBy('name')->get();
-        $products = Product::orderBy('name')->get();
-        return view('remitos.create', compact('clients', 'products'));
+        // Ordenamos por Tipo y luego por Nombre para agrupar visualmente
+        $menus = Menu::orderBy('type')->orderBy('name')->get(); 
+        
+        return view('remitos.create', compact('clients', 'menus'));
     }
 
+    // 3. GUARDAR Y CALCULAR (CORREGIDO PARA EVITAR ERRORES DE NOMBRE)
     public function store(Request $request)
-    {
-        $request->merge(['tipo' => 'remito']);
-        return $this->processSave($request, false);
-    }
-
-    // --- FLUJO DEPÓSITO (Manual con descuento de stock) ---
-    public function createEntrega()
-    {
-        $clients = Client::orderBy('name')->get();
-        // Solo productos con stock > 0
-        $products = Product::where('stock', '>', 0)->orderBy('name')->get();
-        return view('deposito.create', compact('clients', 'products'));
-    }
-
-    public function storeEntrega(Request $request)
-    {
-        $request->merge(['tipo' => 'entrega']);
-        return $this->processSave($request, true);
-    }
-
-    /**
-     * GENERAR DESDE MENÚ
-     * Calcula: (Cantidad Base x Cupo) y guarda el total en base de datos.
-     * DETECTA EL TIPO DE MENÚ PARA EL BALANCE.
-     */
-    public function storeMenu(Request $request)
     {
         $request->validate([
             'client_id' => 'required|exists:clients,id',
             'date'      => 'required|date',
-            'menus'     => 'required|array|min:1', 
+            'menus'     => 'required|array', 
         ]);
 
-        return DB::transaction(function () use ($request) {
-            $client = Client::findOrFail($request->client_id);
+        $client = Client::findOrFail($request->client_id);
+
+        $remito = Remito::create([
+            'client_id' => $client->id,
+            'date'      => $request->date,
+            'number'    => 'REM-' . time(),
+            'status'    => 'Generado'
+        ]);
+
+        foreach ($request->menus as $menuId) {
+            $menu = Menu::with('ingredients')->find($menuId);
             
-            // --- DETECTAR CATEGORÍA PARA BALANCE ---
-            // Tomamos el primer menú seleccionado para saber el tipo (DMC, Comedor, etc.)
-            $firstMenu = Menu::find($request->menus[0]);
-            $categoriaMenu = $firstMenu ? $firstMenu->type : null; 
-            // ---------------------------------------
+            if (!$menu) continue;
 
-            $numeroRemito = 'REM-MENU-' . time();
+            // Determinar cupos
+            $cantidadAlumnos = 0;
+            $tipoMenu = strtolower($menu->type); 
 
-            $remito = Remito::create([
-                'client_id'   => $request->client_id,
-                'number'      => $numeroRemito,
-                'date'        => $request->date,
-                'tipo'        => 'remito', 
-                
-                // GUARDAMOS LA CATEGORÍA AQUÍ (Importante para Balance):
-                'menu_type'   => $categoriaMenu, 
-                
-                'observation' => 'Generado desde Menú (' . ($categoriaMenu ?? 'Gral') . ')',
-            ]);
+            if (str_contains($tipoMenu, 'comedor alternativo')) $cantidadAlumnos = $client->quota_comedor_alt;
+            elseif (str_contains($tipoMenu, 'comedor')) $cantidadAlumnos = $client->quota_comedor;
+            elseif (str_contains($tipoMenu, 'dmc alternativo')) $cantidadAlumnos = $client->quota_dmc_alt;
+            elseif (str_contains($tipoMenu, 'dmc')) $cantidadAlumnos = $client->quota_dmc;
+            elseif (str_contains($tipoMenu, 'listo') || str_contains($tipoMenu, 'lcb')) $cantidadAlumnos = $client->quota_lcb;
+            elseif (str_contains($tipoMenu, 'maternal')) $cantidadAlumnos = $client->quota_maternal;
 
-            foreach ($request->menus as $menuId) {
-                $menu = Menu::with('ingredients')->find($menuId); 
+            if ($cantidadAlumnos > 0) {
+                foreach ($menu->ingredients as $ingrediente) {
+                    
+                    // --- CORRECCIÓN DE SEGURIDAD ---
+                    // Buscamos el nombre en varios campos para evitar el error "name cannot be null"
+                    $nombreIngrediente = $ingrediente->name ?? $ingrediente->nombre ?? $ingrediente->descripcion ?? 'Ingrediente S/N';
+                    $unidadIngrediente = $ingrediente->unit ?? $ingrediente->unidad ?? 'u.';
 
-                if ($menu) {
-                    foreach ($menu->ingredients as $ingredient) {
-                        // Cálculo: Gramos/CC/Un base * Cupos de la escuela
-                        $totalJardin    = ($ingredient->pivot->qty_jardin ?? 0) * ($client->cupo_jardin ?? 0);
-                        $totalPrimaria  = ($ingredient->pivot->qty_primaria ?? 0) * ($client->cupo_primaria ?? 0);
-                        $totalSecundaria = ($ingredient->pivot->qty_secundaria ?? 0) * ($client->cupo_secundaria ?? 0);
+                    $cantidadTotal = $ingrediente->pivot->quantity * $cantidadAlumnos;
 
-                        $cantidadCalculada = $totalJardin + $totalPrimaria + $totalSecundaria;
-
-                        if ($cantidadCalculada > 0) {
-                            $remito->details()->create([
-                                'product_id'    => null, 
-                                'ingredient_id' => $ingredient->id,
-                                'quantity'      => $cantidadCalculada,
-                                'measure_unit'  => $ingredient->pivot->measure_unit ?? 'grams'
-                            ]);
-                        }
-                    }
+                    $remito->items()->create([
+                        'name'     => $nombreIngrediente, // Usamos la variable segura
+                        'quantity' => $cantidadTotal,
+                        'unit'     => $unidadIngrediente, // Usamos la variable segura
+                        'observation' => "Menú: {$menu->name} ($cantidadAlumnos cupos)"
+                    ]);
                 }
             }
+        }
 
-            return redirect()->route('remitos.index')->with('success', 'Remito generado con éxito.');
-        });
+        return redirect()->route('remitos.index')->with('success', 'Remito generado correctamente.');
     }
 
-    /**
-     * VISTA DEL REMITO (Conversión Visual)
-     */
+    // 4. VER EL REMITO
     public function show(Remito $remito)
     {
-        $remito->load(['client', 'details.product', 'details.ingredient']);
-        
-        // Transformamos los detalles para mostrar Kilos/Litros en la vista
-        $remito->details->transform(function ($detail) {
-            return $this->convertUnits($detail);
-        });
-
         return view('remitos.show', compact('remito'));
     }
 
-    /**
-     * PDF DEL REMITO (Conversión Visual)
-     */
+    // 5. IMPRIMIR PDF
     public function print(Remito $remito)
     {
-        $remito->load(['client', 'details.product', 'details.ingredient']);
-        
-        // Aplicamos la misma conversión para el PDF
-        $remito->details->transform(function ($detail) {
-            return $this->convertUnits($detail);
-        });
-
         $pdf = Pdf::loadView('remitos.pdf', compact('remito'));
-        $pdf->setPaper('letter', 'portrait');
-        return $pdf->stream("Remito_{$remito->number}.pdf");
-    }
-
-    // --- FUNCIONES AUXILIARES PRIVADAS ---
-
-    /**
-     * Lógica común para guardar remitos manuales
-     */
-    private function processSave(Request $request, $shouldDiscountStock)
-    {
-        $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'date'      => 'required|date',
-            'items'     => 'required|array|min:1',
-        ]);
-
-        return DB::transaction(function () use ($request, $shouldDiscountStock) {
-            
-            $numeroRemito = $request->number ?? 'ENT-' . time();
-
-            $remito = Remito::create([
-                'client_id'   => $request->client_id,
-                'number'      => $numeroRemito,
-                'date'        => $request->date,
-                'tipo'        => $request->tipo,
-                'observation' => $request->observation,
-            ]);
-
-            foreach ($request->items as $item) {
-                $productId = $item['product_id'];
-                $quantity = $item['quantity'];
-
-                $remito->details()->create([
-                    'product_id'    => $productId,
-                    'ingredient_id' => null,
-                    'quantity'      => $quantity,
-                ]);
-
-                if ($shouldDiscountStock) {
-                    Product::where('id', $productId)->decrement('stock', $quantity);
-                }
-            }
-
-            $route = $shouldDiscountStock ? 'products.index' : 'remitos.index';
-            $message = $shouldDiscountStock ? 'Stock descontado y entrega registrada.' : 'Remito creado exitosamente.';
-
-            return redirect()->route($route)->with('success', $message);
-        });
-    }
-
-    /**
-     * Transforma gramos a kilos y cc a litros solo para visualización
-     */
-    private function convertUnits($detail)
-    {
-        // Si no es un ingrediente (es un producto directo), no convertimos
-        if (!$detail->ingredient_id) {
-            $detail->display_quantity = $detail->quantity;
-            $detail->display_unit = 'un.';
-            return $detail;
-        }
-
-        $unit = $detail->measure_unit ?? 'grams';
-
-        if ($unit === 'grams') {
-            $detail->display_quantity = $detail->quantity / 1000;
-            $detail->display_unit = 'kg.';
-        } elseif ($unit === 'cc') {
-            $detail->display_quantity = $detail->quantity / 1000;
-            $detail->display_unit = 'lts.';
-        } else {
-            $detail->display_quantity = $detail->quantity;
-            $detail->display_unit = 'un.';
-        }
-
-        return $detail;
+        return $pdf->stream('remito-'.$remito->number.'.pdf');
     }
 }

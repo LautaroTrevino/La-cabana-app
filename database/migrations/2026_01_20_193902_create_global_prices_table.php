@@ -11,13 +11,23 @@ return new class extends Migration
      */
     public function up()
     {
-    Schema::create('global_prices', function (Blueprint $table) {
-        $table->id();
-        $table->decimal('valor_dmc', 10, 2)->default(0);
-        $table->decimal('valor_comedor', 10, 2)->default(0);
-        $table->decimal('valor_lc', 10, 2)->default(0);
-        $table->timestamps();
-    });
+        Schema::create('global_prices', function (Blueprint $table) {
+            $table->id();
+            
+            // PRECIOS COMEDOR
+            $table->decimal('valor_comedor', 10, 2)->default(0);
+            $table->decimal('valor_comedor_alt', 10, 2)->default(0); // Faltaba este
+
+            // PRECIOS DMC
+            $table->decimal('valor_dmc', 10, 2)->default(0);
+            $table->decimal('valor_dmc_alt', 10, 2)->default(0); // Faltaba este
+
+            // OTROS SERVICIOS
+            $table->decimal('valor_lc', 10, 2)->default(0);
+            $table->decimal('valor_maternal', 10, 2)->default(0); // Faltaba este
+
+            $table->timestamps();
+        });
     }
 
     /**
