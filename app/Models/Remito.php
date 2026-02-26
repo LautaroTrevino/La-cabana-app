@@ -11,13 +11,12 @@ class Remito extends Model
 
     protected $fillable = ['client_id', 'date', 'number', 'status', 'observation'];
 
-    // Relación con la Escuela
     public function client()
     {
         return $this->belongsTo(Client::class);
     }
 
-    // ESTA ES LA FUNCIÓN QUE FALTABA Y CAUSABA EL ERROR
+    // ESTA FUNCIÓN ES LA QUE SOLUCIONA EL ERROR
     public function items()
     {
         return $this->hasMany(RemitoItem::class);

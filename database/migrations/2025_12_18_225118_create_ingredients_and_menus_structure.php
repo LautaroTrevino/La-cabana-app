@@ -8,43 +8,38 @@ return new class extends Migration
 {
     public function up()
     {
-        // 1. Tabla de Ingredientes (Base de datos general)
+        // 1. Ingredientes
         Schema::create('ingredients', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->text('description')->nullable();
-            
-            // Unidad sugerida por defecto del ingrediente (ej: Harina -> Kg)
-            $table->string('unit_type')->nullable(); 
-            
+            $table->string('unit')->nullable(); // Unidad base (kg, lt)
+            $table->decimal('cost', 10, 2)->default(0); 
             $table->decimal('stock', 10, 2)->default(0); 
             $table->timestamps();
         });
 
-        // 2. Tabla de Menús (Nombres de platos y días)
+        // 2. Menús
         Schema::create('menus', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('type')->nullable(); 
-            $table->integer('day_number'); 
+            $table->string('type')->nullable(); // Comedor, DMC, etc.
+            $table->integer('day_number')->nullable();
             $table->timestamps();
         });
 
-        // 3. Tabla Intermedia (Detalle de la Receta)
+        // 3. Receta (Tabla Intermedia con las 3 cantidades)
         Schema::create('ingredient_menu', function (Blueprint $table) {
             $table->id();
-            
-            // Relaciones
             $table->foreignId('menu_id')->constrained()->onDelete('cascade');
             $table->foreignId('ingredient_id')->constrained()->onDelete('cascade');
             
-            // Cantidades por nivel educativo
-            $table->decimal('qty_jardin', 10, 4)->default(0);    
-            $table->decimal('qty_primaria', 10, 4)->default(0);  
-            $table->decimal('qty_secundaria', 10, 4)->default(0); 
+            // --- AQUI RESTAURAMOS TUS 3 COLUMNAS ---
+            $table->decimal('qty_jardin', 10, 4)->default(0);
+            $table->decimal('qty_primaria', 10, 4)->default(0);
+            $table->decimal('qty_secundaria', 10, 4)->default(0);
             
-            // --- COLUMNA NUEVA CRÍTICA ---
-            // Aquí guardamos si en ESTA receta usamos Gramos, CC o Unidades
+            // Unidad específica para esta receta (opcional, por si la receta usa gramos pero el stock es kg)
             $table->string('measure_unit')->default('grams'); 
             
             $table->timestamps();

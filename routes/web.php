@@ -28,28 +28,31 @@ Route::middleware('auth')->group(function () {
         return redirect()->route('products.index');
     })->middleware('verified')->name('dashboard');
 
-    // 1. PRODUCTOS
+    // 1. PRODUCTOS (Depósito / Stock Real)
     Route::resource('productos', ProductController::class)->names('products');
     Route::post('/products/quick-scan', [ProductController::class, 'quickScan'])->name('products.quickScan');
     Route::post('/products/{id}/movement', [ProductController::class, 'storeMovement'])->name('products.movement');
     Route::get('/historial', [ProductController::class, 'history'])->name('history.index');
 
-    // 2. DEPÓSITO (SALIDA REAL)
+    // 2. DEPÓSITO (Orden de Entrega / Salida de Mercadería)
     Route::get('/deposito/salida', [OrdenEntregaController::class, 'create'])->name('ordenes.create');
     Route::post('/deposito/guardar-real', [OrdenEntregaController::class, 'storeReal'])->name('ordenes.storeReal');
 
-    // 3. REMITOS (DOCUMENTACIÓN)
-    // Orden importante: Rutas específicas primero, luego las genéricas
-    Route::get('/remitos/crear', [RemitoController::class, 'create'])->name('remitos.create'); // Soluciona el 404
+    // 3. REMITOS (Documentación Administrativa)
+    Route::get('/remitos/crear', [RemitoController::class, 'create'])->name('remitos.create');
     Route::post('/remitos/store-menu', [RemitoController::class, 'storeMenu'])->name('remitos.storeMenu');
     Route::post('/remitos', [RemitoController::class, 'store'])->name('remitos.store');
     Route::get('/remitos', [RemitoController::class, 'index'])->name('remitos.index');
     Route::get('/remitos/{remito}', [RemitoController::class, 'show'])->name('remitos.show');
     Route::get('/remitos/{remito}/print', [RemitoController::class, 'print'])->name('remitos.print');
 
-    // 4. MENÚS
+    // 4. MENÚS Y RECETAS
     Route::resource('menus', MenuController::class);
+    
+    // Gestión completa de ingredientes (desde panel lateral)
     Route::resource('ingredients', IngredientController::class);
+    
+    // --- ESTA ES LA RUTA NUEVA PARA EL BOTÓN RÁPIDO EN "CREAR MENÚ" ---
     Route::post('/ingredients/store-api', [MenuController::class, 'storeIngredient'])->name('ingredients.store_api');
 
     // 5. BALANCE
