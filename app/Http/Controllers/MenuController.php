@@ -46,34 +46,8 @@ class MenuController extends Controller
 
         $menu = Menu::create($request->only(['name', 'type', 'day_number']));
 
-        return redirect()
-            ->route('menus.edit', $menu->id)
-            ->with('success', 'Menú creado. Ahora cargá los ingredientes.');
-    }
-
-    public function edit(Menu $menu)
-    {
-        // Cargamos los ingredientes ya asignados al menú (con pivot) y
-        // la lista completa para el selector
-        $menu->load('ingredients');
-        $ingredients = Ingredient::orderBy('name')->get();
-
-        return view('menus.edit', compact('menu', 'ingredients'));
-    }
-
-    public function update(Request $request, Menu $menu)
-    {
-        $request->validate([
-            'name'       => 'required|string|max:255',
-            'day_number' => 'required|integer|min:1|max:31',
-        ]);
-
-        $menu->update([
-            'name'       => $request->name,
-            'day_number' => $request->day_number,
-        ]);
-
-        // Sincronizar ingredientes con la tabla pivot
+        // Procesar ingredientes enviados desde la vista create
+        // (misma lógica que update para mantener consistencia)
         $syncData = [];
 
         if ($request->has('ingredients')) {
@@ -89,11 +63,66 @@ class MenuController extends Controller
             }
         }
 
+        if (! empty($syncData)) {
+            $menu->ingredients()->sync($syncData);
+            return redirect()
+                ->route('menus.index')
+                ->with('success', 'Menú "' . $menu->name . '" creado con ' . count($syncData) . ' ingrediente(s).');
+        }
+
+        // Si no se eligió ningún ingrediente, redirigir a editar para cargarlos
+        return redirect()
+            ->route('menus.edit', $menu->id)
+            ->with('success', 'Menú creado. Ahora cargá los ingredientes y sus cantidades.');
+    }
+
+    public function edit(Menu $menu)
+    {
+        $menu->load('ingredients');
+        $ingredients = Ingredient::orderBy('name')->get();
+        $tiposMenu   = self::TIPOS_MENU;
+
+        return view('menus.edit', compact('menu', 'ingredients', 'tiposMenu'));
+    }
+
+    public function update(Request $request, Menu $menu)
+    {
+        $request->validate([
+            'name'       => 'required|string|max:255',
+            'day_number' => 'required|integer|min:1|max:31',
+        ]);
+
+        $menu->update([
+            'name'       => $request->name,
+            'day_number' => $request->day_number,
+            'type'       => $request->type ?? $menu->type,
+        ]);
+
+        $syncData = [];
+
+        if ($request->has('ingredients')) {
+            foreach ($request->ingredients as $item) {
+                // Solo incluir filas donde el checkbox estaba tildado (_active = 1)
+                if (empty($item['ingredient_id'])) continue;
+                if (($item['_active'] ?? '0') !== '1') continue;
+
+                $syncData[(int) $item['ingredient_id']] = [
+                    'qty_jardin'     => $item['qty_jardin']     ?? 0,
+                    'qty_primaria'   => $item['qty_primaria']   ?? 0,
+                    'qty_secundaria' => $item['qty_secundaria'] ?? 0,
+                    'measure_unit'   => $item['measure_unit']   ?? 'grams',
+                ];
+            }
+        }
+
+        // sync() agrega los nuevos, actualiza los existentes y elimina los destildados
         $menu->ingredients()->sync($syncData);
+
+        $cantidad = count($syncData);
 
         return redirect()
             ->route('menus.index')
-            ->with('success', 'Receta actualizada correctamente.');
+            ->with('success', "Receta actualizada: {$cantidad} ingrediente(s) guardado(s).");
     }
 
     public function destroy(Menu $menu)

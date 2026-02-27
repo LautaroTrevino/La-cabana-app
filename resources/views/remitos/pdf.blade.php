@@ -96,28 +96,20 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($remito->details as $detail)
+            @forelse($remito->items as $item)
             <tr>
-                <td>
-                    @if($detail->ingredient)
-                        <strong>{{ $detail->ingredient->name }}</strong>
-                    @else
-                        <strong>{{ $detail->product->name ?? 'N/A' }}</strong>
-                    @endif
-                </td>
-                <td class="texto-descripcion">
-                    @if($detail->ingredient)
-                        {{ $detail->ingredient->description ?? '-' }}
-                    @else
-                        {{ $detail->product->brand ?? '' }} {{ $detail->product->presentation ?? '' }}
-                    @endif
-                </td>
+                <td><strong>{{ $item->name }}</strong></td>
+                <td class="texto-descripcion">{{ $item->observation ?? '-' }}</td>
                 <td style="text-align: center;">
-                    <span style="font-size: 12px; font-weight: bold;">{{ number_format($detail->quantity, 2, ',', '.') }}</span> 
-                    <span style="font-size: 9px;">Un/Kg</span>
+                    <span style="font-size: 12px; font-weight: bold;">{{ number_format($item->quantity, 2, ',', '.') }}</span>
+                    <span style="font-size: 9px;">{{ $item->unit }}</span>
                 </td>
             </tr>
-            @endforeach
+            @empty
+            <tr>
+                <td colspan="3" style="text-align:center; padding: 20px; color: #999;">Sin ítems registrados.</td>
+            </tr>
+            @endforelse
         </tbody>
     </table>
 
