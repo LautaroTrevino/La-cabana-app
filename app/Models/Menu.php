@@ -11,9 +11,9 @@ class Menu extends Model
 
     protected $fillable = ['name', 'type', 'day_number'];
 
+    // Relación con Ingredientes (NO con productos de stock)
     public function ingredients()
     {
-        // Solicitamos las 3 columnas en la relación
         return $this->belongsToMany(Ingredient::class, 'ingredient_menu')
                     ->withPivot('qty_jardin', 'qty_primaria', 'qty_secundaria', 'measure_unit')
                     ->withTimestamps();

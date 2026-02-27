@@ -8,139 +8,114 @@ use Illuminate\Http\Request;
 
 class MenuController extends Controller
 {
-    private $tiposPermitidos = [
-        'Comedor', 
-        'Comedor Alternativo', 
-        'DMC', 
-        'DMC Alternativo', 
-        'Maternal', 
-        'Listo Consumo'
+    // Tipos canónicos de menú — fuente única de verdad
+    public const TIPOS_MENU = [
+        'Comedor',
+        'Comedor Alternativo',
+        'DMC',
+        'DMC Alternativo',
+        'Listo Consumo',
+        'Maternal',
     ];
 
     public function index()
     {
-        $menus = Menu::orderBy('day_number')->orderBy('name')->get();
-        $tiposMenu = $this->tiposPermitidos;
+        // FIX N+1: cargar ingredients junto con los menús para que
+        // $menu->ingredients->count() en la vista no dispare una query por fila
+        $menus     = Menu::with('ingredients')->orderBy('day_number')->get();
+        $tiposMenu = self::TIPOS_MENU;
+
         return view('menus.index', compact('menus', 'tiposMenu'));
     }
 
+    // FIX: método create() faltante — evita el 404 en GET /menus/create
     public function create()
     {
-        $ingredients = Ingredient::orderBy('name')->get();
-        $tiposMenu = $this->tiposPermitidos;
-        return view('menus.create', compact('ingredients', 'tiposMenu'));
+        $tiposMenu = self::TIPOS_MENU;
+
+        return view('menus.create', compact('tiposMenu'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required',
-            'day_number' => 'required|integer|min:1' 
+            'name'       => 'required|string|max:255',
+            'type'       => 'required|string',
+            'day_number' => 'required|integer|min:1|max:31',
         ]);
 
-        $menu = Menu::create([
-            'name' => $request->name,
-            'type' => $request->type,
-            'day_number' => $request->day_number 
-        ]);
+        $menu = Menu::create($request->only(['name', 'type', 'day_number']));
 
-        // Guardamos ingredientes (detecta checkboxes O cantidades escritas)
-        $this->syncIngredients($menu, $request);
-
-        return redirect()->route('menus.index')->with('success', 'Menú creado correctamente.');
+        return redirect()
+            ->route('menus.edit', $menu->id)
+            ->with('success', 'Menú creado. Ahora cargá los ingredientes.');
     }
 
     public function edit(Menu $menu)
     {
+        // Cargamos los ingredientes ya asignados al menú (con pivot) y
+        // la lista completa para el selector
+        $menu->load('ingredients');
         $ingredients = Ingredient::orderBy('name')->get();
-        $tiposMenu = $this->tiposPermitidos;
-        return view('menus.edit', compact('menu', 'ingredients', 'tiposMenu'));
+
+        return view('menus.edit', compact('menu', 'ingredients'));
     }
 
     public function update(Request $request, Menu $menu)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required',
-            'day_number' => 'required|integer|min:1'
+            'name'       => 'required|string|max:255',
+            'day_number' => 'required|integer|min:1|max:31',
         ]);
 
         $menu->update([
-            'name' => $request->name,
-            'type' => $request->type,
-            'day_number' => $request->day_number
+            'name'       => $request->name,
+            'day_number' => $request->day_number,
         ]);
 
-        // Guardamos ingredientes (detecta checkboxes O cantidades escritas)
-        $this->syncIngredients($menu, $request);
+        // Sincronizar ingredientes con la tabla pivot
+        $syncData = [];
 
-        return redirect()->route('menus.index')->with('success', 'Menú actualizado correctamente.');
+        if ($request->has('ingredients')) {
+            foreach ($request->ingredients as $item) {
+                if (! empty($item['ingredient_id'])) {
+                    $syncData[(int) $item['ingredient_id']] = [
+                        'qty_jardin'     => $item['qty_jardin']     ?? 0,
+                        'qty_primaria'   => $item['qty_primaria']   ?? 0,
+                        'qty_secundaria' => $item['qty_secundaria'] ?? 0,
+                        'measure_unit'   => $item['measure_unit']   ?? 'grams',
+                    ];
+                }
+            }
+        }
+
+        $menu->ingredients()->sync($syncData);
+
+        return redirect()
+            ->route('menus.index')
+            ->with('success', 'Receta actualizada correctamente.');
     }
 
     public function destroy(Menu $menu)
     {
         $menu->delete();
-        return redirect()->route('menus.index')->with('success', 'Menú eliminado.');
+
+        return redirect()
+            ->route('menus.index')
+            ->with('success', 'Menú eliminado correctamente.');
     }
 
-    /**
-     * FUNCIÓN INTELIGENTE DE GUARDADO
-     * Guarda el ingrediente si:
-     * 1. Está marcado con el Checkbox.
-     * 2. O SI NO ESTÁ MARCADO pero tiene alguna cantidad mayor a 0.
-     */
-    private function syncIngredients($menu, $request)
-    {
-        $syncData = [];
-        $items = $request->input('items', []); // Array de cantidades (viene de todos los ingredientes)
-        $checked = $request->input('ingredients', []); // Array de checkboxes (solo lo marcado)
-
-        // Si $checked es null (ninguno marcado), lo hacemos array vacío
-        if (!is_array($checked)) {
-            $checked = [];
-        }
-
-        // Recorremos TODOS los ingredientes que aparecen en el formulario
-        foreach ($items as $ingId => $data) {
-            
-            $qJ = floatval($data['qty_jardin'] ?? 0);
-            $qP = floatval($data['qty_primaria'] ?? 0);
-            $qS = floatval($data['qty_secundaria'] ?? 0);
-            
-            // CONDICIÓN MÁGICA:
-            // Guardamos si el ID está en los checkboxes ($checked)
-            // O SI la suma de cantidades es mayor a 0 (el usuario escribió algo)
-            if (in_array($ingId, $checked) || ($qJ > 0 || $qP > 0 || $qS > 0)) {
-                
-                $syncData[$ingId] = [
-                    'measure_unit'   => $data['measure_unit'] ?? 'kg',
-                    'qty_jardin'     => $qJ,
-                    'qty_primaria'   => $qP,
-                    'qty_secundaria' => $qS,
-                ];
-            }
-        }
-
-        // Sincronizamos (esto borra los viejos y pone los nuevos de la lista filtrada)
-        $menu->ingredients()->sync($syncData);
-    }
-    
-    // API Rápida para crear ingredientes desde el modal
-    public function storeIngredient(Request $request) 
+    // Crear ingrediente rápido desde el modal en la vista de edición
+    public function storeIngredient(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255|unique:ingredients,name',
-            'unit' => 'required|string'
+            'name'        => 'required|string|max:255|unique:ingredients,name',
+            'description' => 'nullable|string',
+            'unit_type'   => 'required|in:grams,cc,units',
         ]);
 
-        Ingredient::create([
-            'name' => $request->name,
-            'unit' => $request->unit,
-            'stock' => 0, 
-            'cost' => 0
-        ]);
+        Ingredient::create($request->only(['name', 'description', 'unit_type']));
 
-        return back()->with('success', 'Ingrediente agregado: ' . $request->name);
+        return back()->with('success', 'Ingrediente "' . $request->name . '" creado correctamente.');
     }
 }

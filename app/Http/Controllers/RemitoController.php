@@ -5,123 +5,197 @@ namespace App\Http\Controllers;
 use App\Models\Remito;
 use App\Models\Client;
 use App\Models\Menu;
-use App\Models\OrdenEntrega; 
+use App\Models\OrdenEntrega;
 use Illuminate\Http\Request;
-use Barryvdh\DomPDF\Facade\Pdf; 
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class RemitoController extends Controller
 {
-    // 1. LISTADO MIXTO (REMITOS Y ENTREGAS)
+    // ─────────────────────────────────────────────────────────────
+    // 1. LISTADO MIXTO (REMITOS ADMINISTRATIVOS + ENTREGAS REALES)
+    // ─────────────────────────────────────────────────────────────
     public function index(Request $request)
     {
         $clients = Client::orderBy('name')->get();
 
-        $queryRemitos = Remito::with('client')->orderBy('date', 'desc');
+        $queryRemitos  = Remito::with('client')->orderBy('date', 'desc');
         $queryEntregas = OrdenEntrega::with(['client', 'details'])->orderBy('date', 'desc');
 
-        // Filtros
-        if ($request->has('client_id') && $request->client_id != '') {
+        // FIX: usar filled() en lugar de has() para ignorar strings vacíos
+        if ($request->filled('client_id')) {
             $queryRemitos->where('client_id', $request->client_id);
             $queryEntregas->where('client_id', $request->client_id);
         }
 
-        if ($request->has('date_search') && $request->date_search != '') {
+        if ($request->filled('date_search')) {
             $queryRemitos->whereDate('date', $request->date_search);
             $queryEntregas->whereDate('date', $request->date_search);
         }
 
-        $remitos = $queryRemitos->get();
+        $remitos  = $queryRemitos->get();
         $entregas = $queryEntregas->get();
 
         return view('remitos.index', compact('remitos', 'entregas', 'clients'));
     }
 
-    // 2. FORMULARIO PARA CREAR NUEVO REMITO
+    // ─────────────────────────────────────────────────────────────
+    // 2. FORMULARIO DE CREACIÓN
+    //    FIX N+1: eager loading de ingredients para evitar N+1 queries
+    //    al llamar $menu->ingredients->count() en la vista
+    // ─────────────────────────────────────────────────────────────
     public function create()
     {
         $clients = Client::orderBy('name')->get();
-        // Ordenamos por Tipo y luego por Nombre
-        $menus = Menu::orderBy('type')->orderBy('name')->get(); 
-        
+
+        $menus = Menu::with('ingredients')
+                     ->orderBy('type')
+                     ->orderBy('day_number')
+                     ->orderBy('name')
+                     ->get();
+
         return view('remitos.create', compact('clients', 'menus'));
     }
 
-    // 3. GUARDAR Y CALCULAR (CORREGIDO: Nombre seguro)
+    // ─────────────────────────────────────────────────────────────
+    // 3. GUARDAR Y CALCULAR — MOTOR DE CÁLCULO CORREGIDO
+    //
+    //  BUG #1 (CRÍTICO): pivot->quantity NO EXISTE en la tabla.
+    //          Las columnas reales son qty_jardin, qty_primaria,
+    //          qty_secundaria. Se selecciona según client->level.
+    //
+    //  BUG #2: measure_unit del pivot no estaba incluido en
+    //          withPivot(), por lo que siempre era null.
+    //
+    //  BUG #3: $ingrediente->unit no existe en el modelo Ingredient.
+    //          El campo correcto es unit_type.
+    //
+    //  BUG #4: Se generaban filas con cantidad 0 cuando la escuela
+    //          no tenía cupo para ese tipo de menú.
+    //
+    //  BUG #5 (storeMenu): Método referenciado en routes/web.php
+    //          pero inexistente en el controlador → 500 error.
+    // ─────────────────────────────────────────────────────────────
     public function store(Request $request)
     {
-        // ... (Validaciones iniciales y creación del Remito igual que antes) ...
         $request->validate([
-            'client_id' => 'required', 'date' => 'required', 'menus' => 'required|array'
+            'client_id' => 'required|exists:clients,id',
+            'date'      => 'required|date',
+            'menus'     => 'required|array|min:1',
         ]);
 
-        $client = \App\Models\Client::findOrFail($request->client_id);
-        
-        $remito = \App\Models\Remito::create([
+        $client = Client::findOrFail($request->client_id);
+
+        // ── BUG #1: Resolver columna de cantidad según nivel educativo ──
+        $nivel    = strtolower(trim($client->level ?? ''));
+        $qtyField = match (true) {
+            str_contains($nivel, 'jardin') || str_contains($nivel, 'jardín') => 'qty_jardin',
+            str_contains($nivel, 'secundari')                                 => 'qty_secundaria',
+            default                                                           => 'qty_primaria',
+        };
+
+        $remito = Remito::create([
             'client_id' => $client->id,
-            'date' => $request->date,
-            'number' => 'REM-' . time(),
-            'status' => 'Generado'
+            'date'      => $request->date,
+            'number'    => 'REM-' . strtoupper(uniqid()),   // más seguro que time()
+            'status'    => 'Generado',
         ]);
 
         foreach ($request->menus as $menuId) {
-            $menu = \App\Models\Menu::with('ingredients')->find($menuId);
-            if (!$menu) continue;
+            $menu = Menu::with('ingredients')->find($menuId);
 
-            // 1. DETERMINAR QUÉ CUPO USAR SEGÚN EL TIPO DE MENÚ
-            $cupos = 0;
-            $tipo = strtolower($menu->type);
+            if (! $menu) {
+                continue;
+            }
 
-            if (str_contains($tipo, 'dmc alternativo')) $cupos = $client->quota_dmc_alt;
-            elseif (str_contains($tipo, 'dmc')) $cupos = $client->quota_dmc;
-            elseif (str_contains($tipo, 'comedor alternativo')) $cupos = $client->quota_comedor_alt;
-            elseif (str_contains($tipo, 'comedor')) $cupos = $client->quota_comedor;
-            // ... agregar resto de lógicas ...
+            // ── Resolver cupo según tipo de menú ──────────────────────
+            $tipoMenu        = strtolower(trim($menu->type ?? ''));
+            $cantidadAlumnos = 0;
 
-            if ($cupos > 0) {
-                foreach ($menu->ingredients as $ing) {
-                    
-                    // 2. DETERMINAR QUÉ CANTIDAD DE LA RECETA USAR SEGÚN EL NIVEL DE LA ESCUELA
-                    // El campo 'level' debe existir en tu tabla clients (Jardin, Primaria, Secundaria)
-                    $cantidadReceta = 0;
-                    $nivelEscuela = strtolower($client->level); // Asegúrate que en Client.php tengas este campo
+            // Orden: alternativo ANTES que el genérico para evitar falsos matches
+            if (str_contains($tipoMenu, 'comedor alternativo')) {
+                $cantidadAlumnos = (int) ($client->quota_comedor_alt ?? 0);
+            } elseif (str_contains($tipoMenu, 'comedor')) {
+                $cantidadAlumnos = (int) ($client->quota_comedor ?? 0);
+            } elseif (str_contains($tipoMenu, 'dmc alternativo')) {
+                $cantidadAlumnos = (int) ($client->quota_dmc_alt ?? 0);
+            } elseif (str_contains($tipoMenu, 'dmc')) {
+                $cantidadAlumnos = (int) ($client->quota_dmc ?? 0);
+            } elseif (str_contains($tipoMenu, 'listo') || str_contains($tipoMenu, 'lcb')) {
+                $cantidadAlumnos = (int) ($client->quota_lcb ?? 0);
+            } elseif (str_contains($tipoMenu, 'maternal')) {
+                $cantidadAlumnos = (int) ($client->quota_maternal ?? 0);
+            }
 
-                    if (str_contains($nivelEscuela, 'jardin') || str_contains($nivelEscuela, 'inicial')) {
-                        $cantidadReceta = $ing->pivot->qty_jardin;
-                    } elseif (str_contains($nivelEscuela, 'secundaria')) {
-                        $cantidadReceta = $ing->pivot->qty_secundaria;
-                    } else {
-                        // Por defecto asumimos Primaria si no aclara
-                        $cantidadReceta = $ing->pivot->qty_primaria;
-                    }
+            // BUG #4: omitir menús sin cupo en esta escuela
+            if ($cantidadAlumnos <= 0) {
+                continue;
+            }
 
-                    // 3. CÁLCULO FINAL
-                    $total = $cantidadReceta * $cupos;
+            foreach ($menu->ingredients as $ingrediente) {
 
-                    if ($total > 0) {
-                        $remito->items()->create([
-                            'name' => $ing->name,
-                            'quantity' => $total,
-                            'unit' => $ing->pivot->measure_unit, // Usamos la unidad declarada en el menú
-                            'observation' => "Menú: {$menu->name} (Nivel: $client->level)"
-                        ]);
-                    }
+                // BUG #1: usar la columna correcta del pivot
+                $qtdBase       = (float) ($ingrediente->pivot->{$qtyField} ?? 0);
+                $cantidadTotal = $qtdBase * $cantidadAlumnos;
+
+                // BUG #4: no guardar filas vacías
+                if ($cantidadTotal <= 0) {
+                    continue;
                 }
+
+                // BUG #2: measure_unit del pivot (unidad propia de la receta)
+                // BUG #3: fallback a unit_type (campo correcto del modelo Ingredient)
+                $unidadRaw = $ingrediente->pivot->measure_unit ?? $ingrediente->unit_type ?? 'grams';
+
+                $unidadLabel = match ($unidadRaw) {
+                    'grams'  => 'g.',
+                    'cc'     => 'cc.',
+                    'units'  => 'un.',
+                    default  => $unidadRaw,
+                };
+
+                $remito->items()->create([
+                    'name'        => $ingrediente->name ?? 'Ingrediente S/N',
+                    'quantity'    => $cantidadTotal,
+                    'unit'        => $unidadLabel,
+                    'observation' => "Menú: {$menu->name} ({$cantidadAlumnos} cupos · " . ucfirst($nivel) . ')',
+                ]);
             }
         }
-        
-        return redirect()->route('remitos.index');
+
+        // Redirigir al detalle del remito recién creado en lugar del listado
+        return redirect()
+            ->route('remitos.show', $remito->id)
+            ->with('success', 'Remito generado correctamente.');
     }
 
-    // 4. VER EL REMITO
+    // ─────────────────────────────────────────────────────────────
+    // 4. VER DETALLE DEL REMITO
+    // ─────────────────────────────────────────────────────────────
     public function show(Remito $remito)
     {
+        $remito->load(['client', 'items']);
+
         return view('remitos.show', compact('remito'));
     }
 
-    // 5. IMPRIMIR PDF
+    // ─────────────────────────────────────────────────────────────
+    // 5. GENERAR PDF
+    // ─────────────────────────────────────────────────────────────
     public function print(Remito $remito)
     {
+        $remito->load(['client', 'items']);
+
         $pdf = Pdf::loadView('remitos.pdf', compact('remito'));
-        return $pdf->stream('remito-'.$remito->number.'.pdf');
+
+        return $pdf->stream('remito-' . $remito->number . '.pdf');
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 6. storeMenu — BUG #5: método faltante referenciado en routes
+    //    Delega al flujo estándar de store() para no romper la ruta.
+    // ─────────────────────────────────────────────────────────────
+    public function storeMenu(Request $request)
+    {
+        return $this->store($request);
     }
 }

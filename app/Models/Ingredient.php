@@ -9,13 +9,13 @@ class Ingredient extends Model
 {
     use HasFactory;
 
-    // AQUI ESTABA EL ERROR: Cambiamos 'unit_type' por 'unit'
-    protected $fillable = ['name', 'description', 'unit', 'cost', 'stock'];
+    // Aquí permitimos guardar nombre y descripción
+    protected $fillable = ['name', 'description','unit_type'];
 
     public function menus()
     {
         return $this->belongsToMany(Menu::class, 'ingredient_menu')
-                    ->withPivot('quantity', 'unit')
+                    ->withPivot('qty_jardin', 'qty_primaria', 'qty_secundaria', 'measure_unit')
                     ->withTimestamps();
     }
 }
