@@ -101,8 +101,7 @@
                 <td><strong>{{ $item->name }}</strong></td>
                 <td class="texto-descripcion">{{ $item->observation ?? '-' }}</td>
                 <td style="text-align: center;">
-                    <span style="font-size: 12px; font-weight: bold;">{{ number_format($item->quantity, 2, ',', '.') }}</span>
-                    <span style="font-size: 9px;">{{ $item->unit }}</span>
+                    <span style="font-size: 12px; font-weight: bold;">{{ $item->formatted_quantity }}</span>
                 </td>
             </tr>
             @empty

@@ -70,8 +70,7 @@
                         <tr>
                             <td class="ps-3 fw-bold">{{ $item->name }}</td>
                             <td class="text-center fs-5">
-                                {{ number_format($item->quantity, 2, ',', '.') }} 
-                                <span class="fs-6 text-muted">{{ $item->unit }}</span>
+                                {{ $item->formatted_quantity }}
                             </td>
                             <td class="text-muted small ps-3">{{ $item->observation }}</td>
                         </tr>

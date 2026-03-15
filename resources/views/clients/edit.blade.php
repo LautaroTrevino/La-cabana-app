@@ -33,6 +33,15 @@
                             <input type="text" name="name" class="form-control" value="{{ old('name', $client->name) }}" required>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label fw-bold">Nivel Educativo</label>
+                            <select name="level" class="form-select" required>
+                                <option value="">Seleccioná...</option>
+                                <option value="jardin"     {{ old('level', $client->level) === 'jardin'     ? 'selected' : '' }}>🌱 Jardín</option>
+                                <option value="primaria"   {{ old('level', $client->level) === 'primaria'   ? 'selected' : '' }}>📚 Primaria</option>
+                                <option value="secundaria" {{ old('level', $client->level) === 'secundaria' ? 'selected' : '' }}>🎓 Secundaria</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label small">Dirección</label>
                             <input type="text" name="address" class="form-control" value="{{ old('address', $client->address) }}">
                         </div>

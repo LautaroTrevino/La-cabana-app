@@ -28,12 +28,17 @@ class MenuController extends Controller
         return view('menus.index', compact('menus', 'tiposMenu'));
     }
 
-    // FIX: método create() faltante — evita el 404 en GET /menus/create
     public function create()
     {
-        $tiposMenu = self::TIPOS_MENU;
+        $tiposMenu   = self::TIPOS_MENU;
+        $ingredients = Ingredient::orderBy('name')->get();
+        $ingredientsJson = $ingredients->map(fn($i) => [
+            'id'        => $i->id,
+            'name'      => $i->name,
+            'unit_type' => $i->unit_type ?? 'grams',
+        ])->toJson();
 
-        return view('menus.create', compact('tiposMenu'));
+        return view('menus.create', compact('tiposMenu', 'ingredients', 'ingredientsJson'));
     }
 
     public function store(Request $request)

@@ -67,92 +67,50 @@
                 </button>
             </div>
 
-            <div class="card-body p-0">
-                @if($ingredients->count() == 0)
-                    <div class="text-center py-5">
-                        <i class="bi bi-basket fs-1 text-muted"></i>
-                        <p class="text-muted mt-2">La lista de ingredientes está vacía.</p>
-                        <button type="button" class="btn btn-outline-success fw-bold"
-                                data-bs-toggle="modal" data-bs-target="#newIngredientModal">
-                            Crear el primer ingrediente (Ej: Fideos)
+            <div class="card-body p-4">
+
+                {{-- BUSCADOR --}}
+                <div class="row g-2 align-items-end mb-4">
+                    <div class="col position-relative">
+                        <label class="form-label fw-bold small text-uppercase text-muted">Buscar ingrediente</label>
+                        <input type="text" id="ingredientSearch"
+                               class="form-control form-control-lg"
+                               placeholder="Escribí para buscar... (ej: Fideos)"
+                               autocomplete="off">
+                        <div id="searchDropdown"
+                             class="list-group shadow position-absolute"
+                             style="display:none; z-index:1000; width:100%; max-height:220px; overflow-y:auto; top:100%;">
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" id="btnAddIngredient" class="btn btn-primary btn-lg fw-bold" disabled>
+                            <i class="bi bi-plus-lg"></i> Agregar
                         </button>
                     </div>
-                @else
-                    <div class="alert alert-light border-bottom mb-0 small">
-                        <i class="bi bi-info-circle text-primary"></i>
-                        Marcá los ingredientes y completá las cantidades por nivel educativo.
-                        <strong>Estos datos son solo para generar remitos administrativos.</strong>
-                    </div>
+                </div>
 
-                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light text-center small text-uppercase sticky-top">
-                                <tr>
-                                    <th class="text-start ps-4" width="25%">Ingrediente</th>
-                                    <th width="12%">Unidad</th>
-                                    <th width="15%" class="bg-warning bg-opacity-25">Cant. Jardín</th>
-                                    <th width="15%" class="bg-primary bg-opacity-25">Cant. Primaria</th>
-                                    <th width="15%" class="bg-secondary bg-opacity-25">Cant. Secundaria</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{--
-                                    FIX: La estructura del array debe coincidir con lo que
-                                    espera MenuController::store() → ingredients[índice][ingredient_id]
-                                    Se usa un índice numérico con JS para los checkboxes.
-                                --}}
-                                @foreach($ingredients as $index => $ingredient)
-                                    <tr class="ingredient-row" data-index="{{ $index }}">
-                                        <td class="ps-4">
-                                            {{-- ingredient_id oculto, se activa con el checkbox --}}
-                                            <input type="hidden"
-                                                   name="ingredients[{{ $index }}][ingredient_id]"
-                                                   value=""
-                                                   class="hidden-ing-id"
-                                                   data-real-id="{{ $ingredient->id }}">
-                                            <div class="form-check">
-                                                <input class="form-check-input ingredient-checkbox"
-                                                       type="checkbox"
-                                                       id="ing_{{ $ingredient->id }}"
-                                                       data-index="{{ $index }}"
-                                                       data-id="{{ $ingredient->id }}">
-                                                <label class="form-check-label fw-bold cursor-pointer"
-                                                       for="ing_{{ $ingredient->id }}">
-                                                    {{ $ingredient->name }}
-                                                    <small class="text-muted fw-normal">({{ $ingredient->unit_type ?? 'u.' }})</small>
-                                                </label>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            {{-- FIX: name="measure_unit" coincide con MenuController --}}
-                                            <select name="ingredients[{{ $index }}][measure_unit]"
-                                                    class="form-select form-select-sm">
-                                                <option value="grams" {{ ($ingredient->unit_type == 'grams') ? 'selected' : '' }}>Gramos</option>
-                                                <option value="cc"    {{ ($ingredient->unit_type == 'cc')    ? 'selected' : '' }}>CC / ML</option>
-                                                <option value="units" {{ ($ingredient->unit_type == 'units') ? 'selected' : '' }}>Unidades</option>
-                                            </select>
-                                        </td>
-                                        <td class="bg-warning bg-opacity-10">
-                                            <input type="number" step="0.0001" min="0"
-                                                   name="ingredients[{{ $index }}][qty_jardin]"
-                                                   class="form-control form-control-sm text-center" placeholder="0">
-                                        </td>
-                                        <td class="bg-primary bg-opacity-10">
-                                            <input type="number" step="0.0001" min="0"
-                                                   name="ingredients[{{ $index }}][qty_primaria]"
-                                                   class="form-control form-control-sm text-center" placeholder="0">
-                                        </td>
-                                        <td class="bg-secondary bg-opacity-10">
-                                            <input type="number" step="0.0001" min="0"
-                                                   name="ingredients[{{ $index }}][qty_secundaria]"
-                                                   class="form-control form-control-sm text-center" placeholder="0">
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
+                {{-- ESTADO VACÍO --}}
+                <div id="noIngredients" class="text-center py-4 text-muted border rounded bg-light">
+                    <i class="bi bi-basket fs-2 d-block mb-2"></i>
+                    Todavía no agregaste ningún ingrediente.<br>Buscá uno arriba para comenzar.
+                </div>
+
+                {{-- TABLA DE INGREDIENTES AGREGADOS --}}
+                <div class="table-responsive" id="ingredientsTableWrapper" style="display:none;">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-center small text-uppercase sticky-top">
+                            <tr>
+                                <th class="text-start ps-3" width="28%">Ingrediente</th>
+                                <th width="13%">Unidad</th>
+                                <th width="15%" class="bg-warning bg-opacity-25">Cant. Jardín</th>
+                                <th width="15%" class="bg-primary bg-opacity-25">Cant. Primaria</th>
+                                <th width="15%" class="bg-secondary bg-opacity-25">Cant. Secundaria</th>
+                                <th width="8%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="ingredientsTableBody"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="card-footer bg-white py-3 text-end">
@@ -209,15 +167,137 @@
 </div>
 
 <script>
-    // Activar/desactivar el hidden input del ingredient_id al tildar el checkbox
-    // El controller ignora filas donde ingredient_id esté vacío
-    document.querySelectorAll('.ingredient-checkbox').forEach(function(checkbox) {
-        checkbox.addEventListener('change', function() {
-            var idx    = this.dataset.index;
-            var realId = this.dataset.id;
-            var hidden = document.querySelector('.hidden-ing-id[data-real-id="' + realId + '"]');
-            hidden.value = this.checked ? realId : '';
+const allIngredients = {!! $ingredientsJson !!};
+
+const unitLabels = { grams: 'Gramos', cc: 'CC / ML', units: 'Unidades' };
+
+let rowIndex      = 0;
+let selectedIngId = null;
+let addedIds      = new Set();
+
+const searchInput  = document.getElementById('ingredientSearch');
+const dropdown     = document.getElementById('searchDropdown');
+const btnAdd       = document.getElementById('btnAddIngredient');
+const tableBody    = document.getElementById('ingredientsTableBody');
+const tableWrapper = document.getElementById('ingredientsTableWrapper');
+const noMsg        = document.getElementById('noIngredients');
+
+// Buscador con dropdown
+searchInput.addEventListener('input', function () {
+    const q = this.value.trim().toLowerCase();
+    selectedIngId   = null;
+    btnAdd.disabled = true;
+    dropdown.innerHTML = '';
+
+    if (q.length < 1) { dropdown.style.display = 'none'; return; }
+
+    const matches = allIngredients.filter(i =>
+        i.name.toLowerCase().includes(q) && !addedIds.has(i.id)
+    );
+
+    if (matches.length === 0) {
+        dropdown.innerHTML = '<span class="list-group-item text-muted small py-2">Sin resultados</span>';
+        dropdown.style.display = 'block';
+        return;
+    }
+
+    matches.forEach(ing => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'list-group-item list-group-item-action py-2';
+        item.innerHTML = `<strong>${ing.name}</strong> <small class="text-muted ms-1">(${unitLabels[ing.unit_type] || ing.unit_type})</small>`;
+        item.addEventListener('click', () => {
+            searchInput.value = ing.name;
+            selectedIngId     = ing.id;
+            btnAdd.disabled   = false;
+            dropdown.style.display = 'none';
+            btnAdd.focus();
         });
+        dropdown.appendChild(item);
     });
+
+    dropdown.style.display = 'block';
+});
+
+// Cerrar dropdown al hacer click afuera
+document.addEventListener('click', e => {
+    if (!searchInput.contains(e.target) && !dropdown.contains(e.target))
+        dropdown.style.display = 'none';
+});
+
+// Permitir seleccionar con Enter en el primer resultado
+searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const first = dropdown.querySelector('button');
+        if (first) first.click();
+    }
+});
+
+// Agregar fila a la tabla
+btnAdd.addEventListener('click', function () {
+    if (!selectedIngId) return;
+    const ing = allIngredients.find(i => i.id === selectedIngId);
+    if (!ing) return;
+
+    addedIds.add(ing.id);
+    const idx = rowIndex++;
+
+    const unitOpts = Object.entries(unitLabels).map(([val, label]) =>
+        `<option value="${val}" ${val === ing.unit_type ? 'selected' : ''}>${label}</option>`
+    ).join('');
+
+    const tr = document.createElement('tr');
+    tr.dataset.ingId = ing.id;
+    tr.innerHTML = `
+        <td class="ps-3 fw-bold">
+            ${ing.name}
+            <input type="hidden" name="ingredients[${idx}][ingredient_id]" value="${ing.id}">
+        </td>
+        <td>
+            <select name="ingredients[${idx}][measure_unit]" class="form-select form-select-sm">${unitOpts}</select>
+        </td>
+        <td class="bg-warning bg-opacity-10">
+            <input type="number" step="0.0001" min="0" name="ingredients[${idx}][qty_jardin]"
+                   class="form-control form-control-sm text-center" placeholder="0" autofocus>
+        </td>
+        <td class="bg-primary bg-opacity-10">
+            <input type="number" step="0.0001" min="0" name="ingredients[${idx}][qty_primaria]"
+                   class="form-control form-control-sm text-center" placeholder="0">
+        </td>
+        <td class="bg-secondary bg-opacity-10">
+            <input type="number" step="0.0001" min="0" name="ingredients[${idx}][qty_secundaria]"
+                   class="form-control form-control-sm text-center" placeholder="0">
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-outline-danger btn-sm btn-remove" title="Quitar">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>`;
+
+    tr.querySelector('.btn-remove').addEventListener('click', () => {
+        addedIds.delete(ing.id);
+        tr.remove();
+        updateTable();
+    });
+
+    tableBody.appendChild(tr);
+    updateTable();
+
+    // Foco al primer campo de cantidad de la fila recién agregada
+    tr.querySelector('input[type="number"]').focus();
+
+    // Resetear buscador
+    searchInput.value = '';
+    selectedIngId     = null;
+    btnAdd.disabled   = true;
+    searchInput.focus();
+});
+
+function updateTable() {
+    const hasRows = tableBody.querySelectorAll('tr').length > 0;
+    tableWrapper.style.display = hasRows ? 'block' : 'none';
+    noMsg.style.display        = hasRows ? 'none'  : 'block';
+}
 </script>
 @endsection

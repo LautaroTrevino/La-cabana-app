@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/remitos', [RemitoController::class, 'index'])->name('remitos.index');
     Route::get('/remitos/{remito}', [RemitoController::class, 'show'])->name('remitos.show');
     Route::get('/remitos/{remito}/print', [RemitoController::class, 'print'])->name('remitos.print');
+    Route::delete('/remitos/{remito}', [RemitoController::class, 'destroy'])->name('remitos.destroy');
 
     // 4. MENÚS Y RECETAS
     Route::resource('menus', MenuController::class);

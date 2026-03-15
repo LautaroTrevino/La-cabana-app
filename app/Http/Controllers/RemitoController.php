@@ -198,4 +198,14 @@ class RemitoController extends Controller
     {
         return $this->store($request);
     }
+
+    public function destroy(Remito $remito)
+    {
+        $remito->items()->delete();
+        $remito->delete();
+
+        return redirect()
+            ->route('remitos.index')
+            ->with('success', 'Remito ' . $remito->number . ' eliminado correctamente.');
+    }
 }

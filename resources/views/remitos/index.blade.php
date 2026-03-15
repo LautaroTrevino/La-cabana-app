@@ -54,7 +54,8 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link fw-bold text-dark" id="entregas-tab" data-bs-toggle="tab" data-bs-target="#entregas" type="button" role="tab">
+            <button class="nav-link fw-bold" id="entregas-tab" data-bs-toggle="tab" data-bs-target="#entregas" type="button" role="tab"
+                    style="color: #0d6efd; border: 2px solid #0d6efd; border-bottom: none; background-color: #e8f0fe;">
                 <i class="bi bi-box-seam"></i> Salidas de Depósito (Real)
             </button>
         </li>
@@ -93,6 +94,16 @@
                                             <a href="{{ route('remitos.print', $remito->id) }}" target="_blank" class="btn btn-sm btn-primary" title="Imprimir PDF">
                                                 <i class="bi bi-printer"></i>
                                             </a>
+                                            <form action="{{ route('remitos.destroy', $remito->id) }}" method="POST" class="d-inline delete-form">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-danger btn-delete"
+                                                        data-number="{{ $remito->number }}"
+                                                        title="Eliminar">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                 @empty
@@ -149,4 +160,50 @@
 
     </div>
 </div>
+
+{{-- MODAL DE CONFIRMACIÓN PARA ELIMINAR --}}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> Eliminar Remito
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body py-4 px-4">
+                <p class="mb-1">¿Estás seguro de que querés eliminar el remito:</p>
+                <p class="fw-bold text-danger fs-5 mb-3" id="deleteModalNumber"></p>
+                <div class="alert alert-warning border-0 mb-0 py-2">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Esta acción <strong>no se puede deshacer</strong> y eliminará todos sus ítems.
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Cancelar
+                </button>
+                <button type="button" id="btnConfirmDelete" class="btn btn-danger fw-bold">
+                    <i class="bi bi-trash me-1"></i> Sí, eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let formToSubmit = null;
+
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', function () {
+            formToSubmit = this.closest('.delete-form');
+            document.getElementById('deleteModalNumber').textContent = this.dataset.number;
+            new bootstrap.Modal(document.getElementById('deleteModal')).show();
+        });
+    });
+
+    document.getElementById('btnConfirmDelete').addEventListener('click', function () {
+        if (formToSubmit) formToSubmit.submit();
+    });
+</script>
 @endsection

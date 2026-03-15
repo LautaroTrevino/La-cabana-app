@@ -10,10 +10,15 @@
             <p class="text-muted mb-0">Administra las recetas y porciones por nivel educativo.</p>
         </div>
         
-        {{-- ESTE BOTÓN AHORA TE LLEVA A LA PÁGINA COMPLETA, NO ABRE MODAL --}}
-        <a href="{{ route('menus.create') }}" class="btn btn-success fw-bold shadow-sm">
-            <i class="bi bi-plus-lg"></i> Nuevo Menú Completo
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{{ route('ingredients.index') }}" class="btn btn-outline-secondary fw-bold shadow-sm">
+                <i class="bi bi-egg-fried"></i> Gestionar Ingredientes
+            </a>
+            {{-- ESTE BOTÓN AHORA TE LLEVA A LA PÁGINA COMPLETA, NO ABRE MODAL --}}
+            <a href="{{ route('menus.create') }}" class="btn btn-success fw-bold shadow-sm">
+                <i class="bi bi-plus-lg"></i> Nuevo Menú Completo
+            </a>
+        </div>
     </div>
 
     {{-- Mensajes de Éxito --}}

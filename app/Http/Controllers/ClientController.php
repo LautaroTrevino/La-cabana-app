@@ -20,9 +20,9 @@ class ClientController extends Controller
 
     public function store(Request $request)
     {
-        // 1. Validamos los datos
         $validated = $request->validate([
             'name'    => 'required|string|max:255',
+            'level'   => 'required|in:jardin,primaria,secundaria',
             'address' => 'nullable|string|max:255',
             'cuit'    => 'nullable|string|max:20',
             'phone'   => 'nullable|string|max:20',
@@ -63,6 +63,7 @@ class ClientController extends Controller
         // 1. Validamos
         $validated = $request->validate([
             'name'    => 'required|string|max:255',
+            'level'   => 'required|in:jardin,primaria,secundaria',
             'address' => 'nullable|string|max:255',
             'cuit'    => 'nullable|string|max:20',
             'phone'   => 'nullable|string|max:20',
