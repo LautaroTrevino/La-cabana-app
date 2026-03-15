@@ -82,9 +82,22 @@
                                                 <i class="bi bi-pencil"></i>
                                             </a>
                                             
-                                            <form action="{{ route('clients.destroy', $client->id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de borrar la escuela {{ $client->name }}?');">
+                                            <form action="{{ route('clients.destroy', $client->id) }}" method="POST"
+                                                  class="d-inline" id="form-client-{{ $client->id }}">
                                                 @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                                @if(Auth::user()->role === 'administrativo')
+                                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                                            data-bs-toggle="modal" data-bs-target="#adminConfirmModal"
+                                                            data-form-id="form-client-{{ $client->id }}"
+                                                            data-label="Escuela: {{ $client->name }}">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                @else
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('¿Estás seguro de borrar la escuela {{ $client->name }}?')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                @endif
                                             </form>
                                         </td>
                                     </tr>
@@ -147,4 +160,6 @@
         </div>
     </div>
 </div>
+
+<x-admin-confirm-modal />
 @endsection

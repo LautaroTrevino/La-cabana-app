@@ -94,15 +94,28 @@
                                             <a href="{{ route('remitos.print', $remito->id) }}" target="_blank" class="btn btn-sm btn-primary" title="Imprimir PDF">
                                                 <i class="bi bi-printer"></i>
                                             </a>
-                                            <form action="{{ route('remitos.destroy', $remito->id) }}" method="POST" class="d-inline delete-form">
+                                            <form action="{{ route('remitos.destroy', $remito->id) }}" method="POST"
+                                                  class="d-inline delete-form" id="form-remito-{{ $remito->id }}">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-danger btn-delete"
-                                                        data-number="{{ $remito->number }}"
-                                                        title="Eliminar">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
+                                                @if(Auth::user()->role === 'administrativo')
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#adminConfirmModal"
+                                                            data-form-id="form-remito-{{ $remito->id }}"
+                                                            data-label="Remito {{ $remito->number }}"
+                                                            title="Eliminar">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                @else
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger btn-delete"
+                                                            data-number="{{ $remito->number }}"
+                                                            title="Eliminar">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                @endif
                                             </form>
                                         </td>
                                     </tr>
@@ -161,7 +174,7 @@
     </div>
 </div>
 
-{{-- MODAL DE CONFIRMACIÓN PARA ELIMINAR --}}
+<x-admin-confirm-modal />
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">

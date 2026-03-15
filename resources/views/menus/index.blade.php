@@ -99,12 +99,23 @@
                                                             <a href="{{ route('menus.edit', $menu->id) }}" class="btn btn-outline-primary btn-sm me-1">
                                                                 <i class="bi bi-pencil-square"></i> Editar
                                                             </a>
-                                                            <form action="{{ route('menus.destroy', $menu->id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Eliminar este menú?');">
+                                                            <form action="{{ route('menus.destroy', $menu->id) }}" method="POST"
+                                                                  class="d-inline" id="form-menu-{{ $menu->id }}">
                                                                 @csrf
                                                                 @method('DELETE')
-                                                                <button class="btn btn-outline-danger btn-sm">
-                                                                    <i class="bi bi-trash"></i>
-                                                                </button>
+                                                                @if(Auth::user()->role === 'administrativo')
+                                                                    <button type="button" class="btn btn-outline-danger btn-sm"
+                                                                            data-bs-toggle="modal" data-bs-target="#adminConfirmModal"
+                                                                            data-form-id="form-menu-{{ $menu->id }}"
+                                                                            data-label="Menú: {{ $menu->name }}">
+                                                                        <i class="bi bi-trash"></i>
+                                                                    </button>
+                                                                @else
+                                                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                                            onclick="return confirm('¿Eliminar este menú?')">
+                                                                        <i class="bi bi-trash"></i>
+                                                                    </button>
+                                                                @endif
                                                             </form>
                                                         </td>
                                                     </tr>
@@ -121,4 +132,6 @@
         </div>
     </div>
 </div>
+
+<x-admin-confirm-modal />
 @endsection
